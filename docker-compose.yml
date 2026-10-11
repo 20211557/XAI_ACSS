@@ -1,0 +1,143 @@
+# =============================================================================
+# XAI 대안신용평가 시스템 - 통합 실행 설정
+#
+#   docker compose up --build                 → mlflow(5000) + api(8000) + dashboard(8501)
+#   docker compose --profile dev up -d dev    → + dev(JupyterLab 8888, 학습·테스트용)
+#   docker compose watch                      → src/ 변경 시 api·dashboard 자동 반영
+#
+# 호스트 포트 등 설정값은 .env 로 덮어쓸 수 있다 (.env.example 참고, 없으면 기본값 사용).
+# =============================================================================
+name: xai-credit
+
+x-build-args: &build-args
+  PYTHON_VERSION: ${PYTHON_VERSION:-3.10}
+
+x-common-env: &common-env
+  APP_ENV: docker
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-xai-credit-scoring}
+  MODEL_NAME: ${MODEL_NAME:-xgboost}
+  MODEL_VERSION: ${MODEL_VERSION:-v1.0}
+
+services:
+  # ---------------------------------------------------------------------------
+  # MLflow Tracking Server: 실험 메타데이터(SQLite) + 아티팩트를 ./mlflow_data 에 저장
+  # 아티팩트는 서버가 프록시(--serve-artifacts)하므로 호스트/컨테이너 어디서 학습해도 동일하게 기록된다
+  # ---------------------------------------------------------------------------
+  mlflow:
+    build:
+      context: .
+      target: mlflow
+      args: *build-args
+    image: xai-credit/mlflow:latest
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+    volumes:
+      - ./mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # FastAPI: 신용평가·XAI·공정성·통계 API (Swagger UI: /docs)
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      target: api
+      args: *build-args
+    image: xai-credit/api:latest
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      <<: *common-env
+    volumes:
+      - ./models:/app/models:ro
+      - ./reports:/app/reports:ro
+    depends_on:
+      mlflow:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./src
+          target: /app/src
+        - action: sync+restart
+          path: ./configs
+          target: /app/configs
+        - action: rebuild
+          path: ./requirements.txt
+
+  # ---------------------------------------------------------------------------
+  # Streamlit 대시보드: 모델을 직접 로드하지 않고 API_URL 로만 통신 (MSA)
+  # ---------------------------------------------------------------------------
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+      args: *build-args
+    image: xai-credit/dashboard:latest
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    environment:
+      APP_ENV: docker
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./src
+          target: /app/src
+        - action: sync+restart
+          path: ./configs
+          target: /app/configs
+        - action: rebuild
+          path: ./requirements-dashboard.txt
+
+  # ---------------------------------------------------------------------------
+  # 개발 환경 (profile: dev) - EDA, 모델 학습, pytest 실행용
+  # 레포 전체를 /app 에 마운트하므로 컨테이너 안에서 만든 파일이 호스트에 그대로 남는다
+  # ---------------------------------------------------------------------------
+  dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      target: dev
+      args: *build-args
+    image: xai-credit/dev:latest
+    ports:
+      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+    environment:
+      <<: *common-env
+      APP_ENV: dev
+      API_URL: http://api:8000
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-xai-dev}
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+      KAGGLE_KEY: ${KAGGLE_KEY:-}
+    volumes:
+      - .:/app
+    depends_on:
+      mlflow:
+        condition: service_healthy

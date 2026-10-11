@@ -1,0 +1,32 @@
+# 빌드 컨텍스트 최소화: 이미지에는 configs/, src/, requirements*.txt 만 필요하다.
+# 데이터·모델·리포트는 docker-compose 에서 볼륨으로 마운트한다.
+.git
+.github
+.gitignore
+.gitattributes
+.env
+.env.*
+!.env.example
+
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.ipynb_checkpoints
+.coverage
+htmlcov
+
+data
+models
+mlflow_data
+mlruns
+reports
+notebooks
+docs
+tests
+
+.vscode
+.idea
+*.log

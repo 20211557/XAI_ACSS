@@ -1,0 +1,9 @@
+# 대시보드 이미지 전용 (ML 라이브러리 미포함 → 모델 직접 로드 불가, MSA 강제)
+# 버전은 requirements.txt 와 동일하게 유지한다.
+streamlit==1.65.0
+requests==2.34.2
+pandas==2.3.3
+plotly==7.1.0
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
+pyyaml==6.0.3
