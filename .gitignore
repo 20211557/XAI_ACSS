@@ -1,0 +1,44 @@
+# ----- 환경 변수 (비밀값) -----
+.env
+.env.*
+!.env.example
+kaggle.json
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ----- Jupyter -----
+.ipynb_checkpoints/
+
+# ----- 데이터: Kaggle 대회 데이터는 재배포 금지 → 각자 다운로드 (data/README.md) -----
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# ----- MLflow 실험 저장소 -----
+# 학습할 때마다 SQLite DB 가 바뀌므로 평소에는 커밋하지 않는다.
+# 최종 제출 시 "clone 후 MLflow UI 에서 실험 확인" 요건을 위해 포함 여부를 결정한다.
+mlflow_data/*
+!mlflow_data/.gitkeep
+mlruns/
+
+# ※ models/ (*.pkl, *.joblib) 와 reports/ 는 제출 요건이므로 추적한다.
+
+# ----- IDE / OS -----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

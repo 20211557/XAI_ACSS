@@ -1,0 +1,14 @@
+# 줄바꿈을 LF 로 통일 (Windows/macOS/Linux 팀원 간 diff 노이즈 방지, 컨테이너 내 스크립트 오류 방지)
+* text=auto eol=lf
+
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# 바이너리 산출물
+*.pkl     binary
+*.joblib  binary
+*.png     binary
+*.jpg     binary
+*.pdf     binary
+*.db      binary
+*.parquet binary
