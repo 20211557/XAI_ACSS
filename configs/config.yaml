@@ -1,59 +1,21 @@
 # =============================================================================
-# 모델·비즈니스 설정값 (임계값, 분할 비율 등)
+# 공통 설정값 (과제 기준 임계값, XAI·공정성·통계 모듈 설정)
 # 환경마다 달라지는 값(포트, 서비스 주소, 경로)은 .env / 환경 변수로 관리한다 → src/config.py
-# 표시가 없는 값은 과제 명세에서 정한 기준이다. "(초기값)" 은 실험 후 조정한다.
+#
+# 세부 설정은 파일별로 한 곳에서만 관리한다 (값을 여기에 중복해서 적지 않는다):
+#   data.yaml          GMSC 정제 규칙 (특수코드, 사용률 기준, 최소 연령)           → src/data/preprocessor.py
+#   simulator.yaml     대안 변수 8개, thin_filer_ratio / bias_ratio, 씬파일러 규칙  → src/data/simulator.py
+#   actionability.yaml 변수별 조치 가능성, 단조 제약, 모델 변수 여부                → src/data/features.py
+#   train.yaml         분할 70:15:15 (stratify=y), 5 × 5겹 CV, 알고리즘·불균형 처리,
+#                      하이퍼파라미터, 모델 버전, MLflow 실험                        → src/models/train.py
+#   scoring.yaml       PD → 점수(0~1000) → 등급 A~E → 승인 (점수 475 이상)        → src/models/scoring.py
+#   german.yaml        German Credit 보조 모델                                    → src/models/german.py
 # =============================================================================
 
 project:
   name: XAI 기반 대안신용평가 시스템
   disclaimer: 본 시스템은 교육 목적으로 개발되었으며, 실제 금융 의사결정에 사용할 수 없습니다.
   random_seed: 42
-
-data:
-  dataset: give_me_some_credit        # give_me_some_credit | german_credit
-  raw_file: cs-training.csv            # data/raw/ 아래 파일명
-  target_col: SeriousDlqin2yrs
-  split:                               # 70:15:15 또는 80:10:10
-    train: 0.70
-    valid: 0.15
-    test: 0.15
-    stratify: true
-
-simulator:
-  thin_filer_ratio: 0.3                # (초기값) 씬파일러 비율
-  bias_ratio: 0.1                      # (초기값) 0: 편향 없음 ~ 1: 최대 편향
-  target_corr_range: [0.3, 0.5]        # 대안 변수 ↔ Target 상관계수 허용 범위 (절댓값)
-  alternative_features:
-    - telecom_payment_rate
-    - utility_payment_rate
-    - spending_consistency
-    - regular_payment_count
-    - app_login_frequency
-
-thin_filer:
-  # 연체 관련 컬럼 중 결측이 min_missing_delinquency_cols 개 이상이거나
-  # 신용카드 거래 이력이 min_credit_history_months 개월 미만이면 씬파일러
-  delinquency_cols:
-    - NumberOfTime30-59DaysPastDueNotWorse
-    - NumberOfTime60-89DaysPastDueNotWorse
-    - NumberOfTimes90DaysLate
-  min_missing_delinquency_cols: 2
-  min_credit_history_months: 12
-
-training:
-  cv_folds: 5
-  algorithms: [logistic_regression, xgboost, lightgbm]
-  imbalance_methods: [class_weight, smote]
-
-scoring:
-  score_range: [0, 1000]
-  approval_threshold: 0.5              # (초기값) 부도확률이 이 값 이상이면 REJECTED
-  risk_grade_upper_bounds:             # (초기값) 부도확률 상한 → 리스크 등급
-    A: 0.05
-    B: 0.10
-    C: 0.20
-    D: 0.35
-    E: 1.00
 
 performance_targets:
   auc_roc_min: 0.78
@@ -70,7 +32,7 @@ explainer:
 
 fairness:
   protected_attributes:
-    gender: [male, female]
+    gender: [male, female]             # 시뮬레이션 값 (configs/simulator.yaml 의 gender)
     age_group: ["20-34", "35-54", "55+"]
   di_ratio_bounds: [0.8, 1.25]         # 범위를 벗어나면 WARNING 로그
   equalized_odds_max_diff: 0.10        # TPR/FPR 차이 허용 상한
@@ -81,3 +43,4 @@ statistics:
     small: 0.01
     medium: 0.06
     large: 0.14
+  # ANOVA 입력 데이터는 configs/train.yaml 의 outputs.cv_fold_auc (reports/anova_handoff_ko.md 참고)

@@ -29,9 +29,12 @@ data/processed/*
 # ----- MLflow 실험 저장소 -----
 # 학습할 때마다 SQLite DB 가 바뀌므로 평소에는 커밋하지 않는다.
 # 최종 제출 시 "clone 후 MLflow UI 에서 실험 확인" 요건을 위해 포함 여부를 결정한다.
+#   mlflow_data/ : docker compose 의 MLflow 서버 저장소
+#   mlruns/      : MLFLOW_TRACKING_URI 없이 로컬에서 학습할 때의 저장소 (src/models/train.py)
 mlflow_data/*
 !mlflow_data/.gitkeep
 mlruns/
+mlartifacts/
 
 # ※ models/ (*.pkl, *.joblib) 와 reports/ 는 제출 요건이므로 추적한다.
 

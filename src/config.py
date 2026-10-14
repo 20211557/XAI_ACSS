@@ -2,6 +2,7 @@
 
 - 환경마다 달라지는 값(서비스 주소, 경로, 모델 버전)은 환경 변수 / .env 에서 읽는다 → ``Settings``
 - 모델·비즈니스 임계값은 ``configs/config.yaml`` 에서 읽는다 → ``load_config()``
+  (데이터·시뮬레이터·학습·점수 세부 설정은 ``configs/*.yaml`` 각 파일, 해당 모듈이 직접 읽는다)
 
 상대 경로는 모두 PROJECT_ROOT 기준으로 해석하므로 코드에 절대 경로를 쓰지 않는다.
 """
@@ -33,7 +34,6 @@ class Settings(BaseSettings):
 
     api_url: str = "http://localhost:8000"
     mlflow_tracking_uri: str = "http://localhost:5000"
-    mlflow_experiment_name: str = "xai-credit-scoring"
 
     model_name: str = "xgboost"
     model_version: str = "v1.0"
@@ -55,7 +55,8 @@ class Settings(BaseSettings):
 
     @property
     def model_path(self) -> Path:
-        return self.model_dir / f"{self.model_id}.pkl"
+        """src/models/train.py 가 저장하는 파일 (예: ``models/xgboost_v1.0.joblib``)."""
+        return self.model_dir / f"{self.model_id}.joblib"
 
 
 @lru_cache

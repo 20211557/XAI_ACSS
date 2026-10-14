@@ -11,7 +11,7 @@
 #
 # 각 서비스는 docker-compose.yml 에서 target 으로 선택해 빌드한다.
 # =============================================================================
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.12
 
 # -----------------------------------------------------------------------------
 # base: 모든 이미지 공통 (Python 런타임, 비루트 사용자)
@@ -41,14 +41,20 @@ RUN pip install "$(grep -E '^mlflow==' /tmp/requirements.txt)" \
 
 USER app
 EXPOSE 5000
+# MLflow 3 는 Host 헤더를 검사한다 (기본: localhost·사설 IP 만 허용).
+# 다른 컨테이너가 http://mlflow:5000 으로 접속하므로 서비스 이름을 허용 목록에 넣는다.
 CMD ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", \
      "--backend-store-uri", "sqlite:////mlflow/mlflow.db", \
-     "--serve-artifacts", "--artifacts-destination", "/mlflow/artifacts"]
+     "--serve-artifacts", "--artifacts-destination", "/mlflow/artifacts", \
+     "--allowed-hosts", "mlflow:*,localhost:*,127.0.0.1:*"]
 
 # -----------------------------------------------------------------------------
 # ml: 학습/추론 공통 런타임 (XGBoost/LightGBM 은 OpenMP 런타임 libgomp 필요)
 # -----------------------------------------------------------------------------
 FROM base AS ml
+
+# 이미지에 git 이 없으므로 MLflow(GitPython)의 git 경고를 끈다
+ENV GIT_PYTHON_REFRESH=quiet
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libgomp1 \

@@ -1,0 +1,211 @@
+{
+  "main_12m_495": {
+    "view": "main_12m_495",
+    "horizon_months": 12,
+    "target_score": 495,
+    "variables": [
+      "RevolvingUtilizationOfUnsecuredLines",
+      "DebtRatio",
+      "MonthlyIncome",
+      "telecom_payment_rate",
+      "utility_payment_rate",
+      "telecom_tenure_months",
+      "insurance_paid_months",
+      "spending_consistency"
+    ],
+    "rejected": 2941,
+    "feasible_share": 0.8786,
+    "feasible_share_thin": 0.87,
+    "feasible_share_not_thin": 0.8802,
+    "not_feasible": 357,
+    "vars_needed": {
+      "1": 1663,
+      "2": 700,
+      "3": 221
+    },
+    "blocked_by_3_var_limit": 238,
+    "blocked_even_with_all_vars": 119,
+    "top_paths": {
+      "spending_consistency": 1329,
+      "insurance_paid_months + spending_consistency": 624,
+      "insurance_paid_months": 324,
+      "RevolvingUtilizationOfUnsecuredLines + insurance_paid_months + spending_consistency": 112,
+      "utility_payment_rate + insurance_paid_months + spending_consistency": 61
+    },
+    "not_feasible_profile": {
+      "rows": 357,
+      "median_score": 121.0,
+      "median_points_short": 374.0,
+      "share_serious_late_60plus": 0.8319,
+      "share_special_code_96_98": 0.0168
+    },
+    "minimal_path_reaches_target": 1.0
+  },
+  "all_24m_495": {
+    "view": "all_24m_495",
+    "horizon_months": 24,
+    "target_score": 495,
+    "variables": [
+      "RevolvingUtilizationOfUnsecuredLines",
+      "DebtRatio",
+      "MonthlyIncome",
+      "telecom_payment_rate",
+      "utility_payment_rate",
+      "telecom_tenure_months",
+      "insurance_paid_months",
+      "spending_consistency"
+    ],
+    "rejected": 2941,
+    "feasible_share": 0.9184,
+    "feasible_share_thin": 0.917,
+    "feasible_share_not_thin": 0.9186,
+    "not_feasible": 240,
+    "vars_needed": {
+      "1": 1715,
+      "2": 734,
+      "3": 252
+    },
+    "blocked_by_3_var_limit": 229,
+    "blocked_even_with_all_vars": 11,
+    "top_paths": {
+      "spending_consistency": 1370,
+      "insurance_paid_months + spending_consistency": 545,
+      "insurance_paid_months": 298,
+      "RevolvingUtilizationOfUnsecuredLines + spending_consistency": 165,
+      "RevolvingUtilizationOfUnsecuredLines + insurance_paid_months + spending_consistency": 162
+    },
+    "not_feasible_profile": {
+      "rows": 240,
+      "median_score": 93.5,
+      "median_points_short": 401.5,
+      "share_serious_late_60plus": 0.8875,
+      "share_special_code_96_98": 0.0167
+    }
+  },
+  "no_time_only_12m_495": {
+    "view": "no_time_only_12m_495",
+    "horizon_months": 12,
+    "target_score": 495,
+    "variables": [
+      "RevolvingUtilizationOfUnsecuredLines",
+      "DebtRatio",
+      "MonthlyIncome",
+      "telecom_payment_rate",
+      "utility_payment_rate",
+      "spending_consistency"
+    ],
+    "rejected": 2941,
+    "feasible_share": 0.7531,
+    "feasible_share_thin": 0.7242,
+    "feasible_share_not_thin": 0.7583,
+    "not_feasible": 726,
+    "vars_needed": {
+      "1": 1588,
+      "2": 440,
+      "3": 187
+    },
+    "blocked_by_3_var_limit": 161,
+    "blocked_even_with_all_vars": 565,
+    "top_paths": {
+      "spending_consistency": 1569,
+      "RevolvingUtilizationOfUnsecuredLines + spending_consistency": 328,
+      "RevolvingUtilizationOfUnsecuredLines + utility_payment_rate + spending_consistency": 113,
+      "utility_payment_rate + spending_consistency": 85,
+      "RevolvingUtilizationOfUnsecuredLines + telecom_payment_rate + spending_consistency": 32
+    },
+    "not_feasible_profile": {
+      "rows": 726,
+      "median_score": 192.0,
+      "median_points_short": 303.0,
+      "share_serious_late_60plus": 0.7163,
+      "share_special_code_96_98": 0.0152
+    }
+  },
+  "reference_12m_475": {
+    "view": "reference_12m_475",
+    "horizon_months": 12,
+    "target_score": 475,
+    "variables": [
+      "RevolvingUtilizationOfUnsecuredLines",
+      "DebtRatio",
+      "MonthlyIncome",
+      "telecom_payment_rate",
+      "utility_payment_rate",
+      "telecom_tenure_months",
+      "insurance_paid_months",
+      "spending_consistency"
+    ],
+    "rejected": 2941,
+    "feasible_share": 0.9004,
+    "feasible_share_thin": 0.8969,
+    "feasible_share_not_thin": 0.901,
+    "not_feasible": 293,
+    "vars_needed": {
+      "1": 1873,
+      "2": 605,
+      "3": 170
+    },
+    "blocked_by_3_var_limit": 214,
+    "blocked_even_with_all_vars": 79,
+    "top_paths": {
+      "spending_consistency": 1494,
+      "insurance_paid_months + spending_consistency": 552,
+      "insurance_paid_months": 364,
+      "RevolvingUtilizationOfUnsecuredLines + insurance_paid_months + spending_consistency": 91,
+      "utility_payment_rate + insurance_paid_months + spending_consistency": 52
+    },
+    "not_feasible_profile": {
+      "rows": 293,
+      "median_score": 107.0,
+      "median_points_short": 368.0,
+      "share_serious_late_60plus": 0.843,
+      "share_special_code_96_98": 0.0137
+    },
+    "minimal_path_reaches_target": 1.0
+  },
+  "reference_24m_475": {
+    "view": "reference_24m_475",
+    "horizon_months": 24,
+    "target_score": 475,
+    "variables": [
+      "RevolvingUtilizationOfUnsecuredLines",
+      "DebtRatio",
+      "MonthlyIncome",
+      "telecom_payment_rate",
+      "utility_payment_rate",
+      "telecom_tenure_months",
+      "insurance_paid_months",
+      "spending_consistency"
+    ],
+    "rejected": 2941,
+    "feasible_share": 0.9361,
+    "feasible_share_thin": 0.9507,
+    "feasible_share_not_thin": 0.9335,
+    "not_feasible": 188,
+    "vars_needed": {
+      "1": 1924,
+      "2": 618,
+      "3": 211
+    },
+    "blocked_by_3_var_limit": 182,
+    "blocked_even_with_all_vars": 6,
+    "top_paths": {
+      "spending_consistency": 1528,
+      "insurance_paid_months + spending_consistency": 477,
+      "insurance_paid_months": 336,
+      "RevolvingUtilizationOfUnsecuredLines + insurance_paid_months + spending_consistency": 135,
+      "RevolvingUtilizationOfUnsecuredLines + spending_consistency": 127
+    },
+    "not_feasible_profile": {
+      "rows": 188,
+      "median_score": 73.5,
+      "median_points_short": 401.5,
+      "share_serious_late_60plus": 0.9043,
+      "share_special_code_96_98": 0.0106
+    }
+  },
+  "test_rows": 22500,
+  "rejected": 2941,
+  "rejected_share": 0.1307,
+  "rejected_share_thin": 0.2533
+}
