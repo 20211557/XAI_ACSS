@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
 
@@ -32,5 +32,5 @@ def health() -> HealthResponse:
         status="healthy",
         model_version=settings.model_id,
         model_available=settings.model_path.exists(),
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
