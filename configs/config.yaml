@@ -29,6 +29,31 @@ explainer:
   dependence_plot_min_features: 2
   rejection_reasons_top_k: 5
   rejection_reasons_min: 3
+  rejection_reason_min_contribution: 0.01   # |기여도| 가 이보다 작은 변수는 거절 사유에서 뺀다 (log-odds)
+  # 거절 사유 문장의 값 표시 (kind: pct | count | money | decimal | flag). 비교 기준은 배포 모델의
+  # 학습 데이터 중앙값 (파이프라인 imputer 의 statistics_)
+  value_format:
+    RevolvingUtilizationOfUnsecuredLines: {kind: pct}
+    age: {kind: count, unit: 세}
+    NumberOfTime30-59DaysPastDueNotWorse: {kind: count, unit: 회}
+    DebtRatio: {kind: pct}
+    MonthlyIncome: {kind: money}
+    NumberOfOpenCreditLinesAndLoans: {kind: count, unit: 개}
+    NumberOfTimes90DaysLate: {kind: count, unit: 회}
+    NumberRealEstateLoansOrLines: {kind: count, unit: 건}
+    NumberOfTime60-89DaysPastDueNotWorse: {kind: count, unit: 회}
+    NumberOfDependents: {kind: count, unit: 명}
+    pastdue_special_code: {kind: flag}
+    income_missing: {kind: flag}
+    income_zero: {kind: flag}
+    util_outlier: {kind: flag}
+    telecom_payment_rate: {kind: pct}
+    utility_payment_rate: {kind: pct}
+    telecom_tenure_months: {kind: count, unit: 개월}
+    insurance_paid_months: {kind: count, unit: 개월}
+    spending_consistency: {kind: decimal, unit: 점}
+    regular_payment_count: {kind: count, unit: 건}
+    app_login_frequency: {kind: count, unit: 회}
 
 fairness:
   protected_attributes:
@@ -36,6 +61,7 @@ fairness:
     age_group: ["20-34", "35-54", "55+"]
   di_ratio_bounds: [0.8, 1.25]         # 범위를 벗어나면 WARNING 로그
   equalized_odds_max_diff: 0.10        # TPR/FPR 차이 허용 상한
+  default_attribute: gender            # GET /fairness 의 기본 보호 속성 (gender | age_band)
 
 statistics:
   alpha: 0.05
@@ -43,4 +69,34 @@ statistics:
     small: 0.01
     medium: 0.06
     large: 0.14
-  # ANOVA 입력 데이터는 configs/train.yaml 의 outputs.cv_fold_auc (reports/anova_handoff_ko.md 참고)
+  # ANOVA 입력: 5 × 5 폴드 AUC (api.reports.cv_fold_auc). 검증 정의는 reports/anova_handoff_ko.md 를 따른다
+  anova:
+    test_1:
+      name: 피처 그룹별 AUC 비교 (One-way ANOVA)
+      group: features
+      filter: {segment: all}
+      labels: {gmsc: 전통 Only, alt: 대안 Only, both: 통합}
+    test_2:
+      name: 알고리즘별 AUC 비교 (One-way ANOVA)
+      group: model
+      filter: {segment: all}
+      labels: {lr: LogisticRegression, xgb: XGBoost, lgbm: LightGBM}
+
+api:
+  # API 가 읽는 산출물 (REPORTS_DIR 기준 상대 경로). 학습·점검 코드가 만든다
+  reports:
+    final_summary: final_summary.json      # src/models/train.py (configs/train.yaml outputs)
+    grade_table: grade_table.csv           # src/models/train.py
+    cv_fold_auc: cv_fold_auc.csv           # src/models/train.py
+    fairness_audit: audit/2_fairness.json  # notebooks/audit.py
+    shap_global: shap_global_top10.csv     # notebooks/model_report.py
+  curve_points: 50                         # ROC / PR 곡선 좌표 수
+
+dashboard:
+  # 리스크 등급별 위험도 색상 (고위험 = 빨강, 중위험 = 노랑, 저위험 = 초록)
+  risk_levels:
+    A: low
+    B: low
+    C: medium
+    D: high
+    E: high

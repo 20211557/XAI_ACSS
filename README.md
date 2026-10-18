@@ -155,6 +155,29 @@ pytest
   MLflow 서버에만 기록한 경우 이 테스트는 건너뛴다 (`REQUIRE_DATA=1` 이면 실패).
 - Windows 에서 직접 실행하면 배포 모델을 불러오는 테스트 3개가 위 Windows 주의 때문에 실패한다. dev 컨테이너에서 실행한다.
 
+## API 엔드포인트
+
+Swagger UI: http://localhost:8000/docs (요청 예시 포함). 응답의 `is_dummy` 가 `true` 인 값은 아직 계산할 수 없어
+넣은 예시 값이며, 대시보드에는 🟡 **더미 데이터** 로 표시된다 (`src/api/dummy.py`).
+
+| 엔드포인트 | 메서드 | 내용 | 데이터 |
+| --- | --- | --- | --- |
+| `/health` | GET | 상태, 모델 버전 | 실제 |
+| `/predict` | POST | 신용 점수(0~1000), 승인 여부, 부도 확률, 리스크 등급(A~E), 씬파일러 여부 | 실제 (배포 모델) |
+| `/explain` | POST | 거절 사유 Top 5 (feature, current_value, shap_contribution, explanation), 변수별 SHAP | 실제 (배포 모델 + SHAP) |
+| `/fairness` | GET | 성별·연령대 DI Ratio, Equalized Odds (TPR/FPR 차이), 집단별 승인율 | 실제 (`reports/audit/2_fairness.json`) |
+| `/fairness/mitigation` | GET | Mitigation 전/후 비교 | 전: 실제, **후: 더미** (`src/fairness` 구현 전) |
+| `/metrics` | GET | AUC, KS, Precision, Recall, F1, 혼동행렬, 등급표 | 실제 (`reports/final_summary.json`), **ROC/PR 곡선 좌표: 더미** |
+| `/anova` | GET | One-way ANOVA 2종 (F, p, η²), Tukey HSD | 실제 (`reports/cv_fold_auc.csv`) |
+| `/explain/global` | GET | 전역 SHAP 중요도 (대시보드용) | 실제 (Top 10, `reports/shap_global_top10.csv`) |
+| `/features` | GET | 입력 변수 설명·범위·기본값 (대시보드 입력 폼용) | 실제 |
+
+- 고객 입력 JSON 의 키는 학습 데이터 컬럼명이다 (예: `NumberOfTimes90DaysLate`). 값이 `null` 이면 학습 데이터 중앙값으로
+  대체되며, 원시 입력에는 학습 때와 같은 정제 규칙(특수코드 96/98, 소득 결측·0, 사용률 이상치)이 적용된다 (`src/models/predictor.py`).
+- 거절 사유의 `shap_contribution` 은 과제 예시처럼 승인 방향 기준이다 (음수 = 거절 쪽). 비교 기준은 학습 데이터 중앙값이다.
+- `/predict` 응답 시간은 약 0.03초다 (모델과 SHAP explainer 는 서버 시작 때 미리 불러온다).
+- ANOVA 검증 정의(집단, 필터, 라벨)는 `configs/config.yaml` 의 `statistics.anova` 에서 바꿀 수 있다.
+
 ## 모델 결과 (공식: 테스트 세트, 배포 모델 `models/xgboost_v1.0.joblib`)
 
 XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + validation 으로 학습하고 15% 테스트 세트에서 한 번만 평가. 95% 부트스트랩 구간.
@@ -216,11 +239,11 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 │   ├── config.py            # 환경 변수(.env) + configs/config.yaml 로더
 │   ├── utils/               # 로거 등 공통 유틸
 │   ├── data/                # loader, preprocessor, simulator, features(씬파일러 판정), actionability_table
-│   ├── models/              # train, evaluate, scoring, german (+ registry 예정)
-│   ├── explainer/           # SHAP 해석, 거절 사유 생성
+│   ├── models/              # train, evaluate, scoring, german, predictor(서빙) (+ registry 예정)
+│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (거절 사유 문장)
 │   ├── fairness/            # DI Ratio, Equalized Odds, Bias Mitigation
-│   ├── statistics/          # anova.py (One-way ANOVA, Tukey HSD)
-│   ├── api/                 # FastAPI (main.py, schemas.py)
+│   ├── statistics/          # anova.py (One-way ANOVA, η², Tukey HSD)
+│   ├── api/                 # FastAPI (main.py, schemas.py, reports.py, dummy.py)
 │   └── dashboard/           # Streamlit (app.py, api_client.py)
 ├── tests/                   # pytest 단위 테스트
 ├── Dockerfile               # 멀티 스테이지: mlflow / api / dashboard / dev
@@ -264,6 +287,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 - DiCE 에서 소득과 부채비율을 연결해야 한다 (소득이 오르면 부채비율이 내려감).
 - ANOVA 데이터: `reports/cv_fold_auc.csv` (5 × 5 폴드, 세그먼트 all / thin / general) 와 [reports/anova_handoff_ko.md](reports/anova_handoff_ko.md).
 - 실제 성별 점검: `reports/german/oof_predictions.csv` ([reports/german_report_ko.md](reports/german_report_ko.md) 참고).
+- **API·대시보드 연결 지점:** 거절 사유 `src/explainer/reasons.py`, ANOVA `src/statistics/anova.py` 는 1차 구현이다 (자유롭게 수정). Bias Mitigation 을 구현하면 `src/api/dummy.py` 의 `mitigated()` 대신 그 결과를 `/fairness/mitigation` 에 연결한다.
 
 **윤제진 (MLflow, Docker, FastAPI, Streamlit)**
 - [reports/mlflow_schema_ko.md](reports/mlflow_schema_ko.md): 실험 (알고리즘별, final, audit), 지표 키, 입력 열 21개, 모델 불러오는 방법. 모든 모델 아티팩트에 signature 와 input example 이 있으며, 서빙 모델은 확률을 반환한다 (1번 열 = PD).
@@ -308,18 +332,18 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 - [x] 12. 5-Fold Cross-Validation 및 성능 평가
 - [x] 13. AUC-ROC, KS 통계량 계산 모듈 개발
 - [x] 14. 씬파일러 집단 대안 데이터 효과 분석
-- [ ] 15. ANOVA 통계 검증 모듈 개발 (2가지 검증 + Tukey HSD) · 입력 데이터 준비됨 (`reports/cv_fold_auc.csv`)
-- [ ] 16. SHAP TreeExplainer 적용 및 전역 해석 시각화 · 모델 보고서에 전역 SHAP Top 10 있음, `src/explainer/` 미구현
-- [ ] 17. SHAP 지역 해석 (Force Plot, Waterfall) 구현
-- [ ] 18. 거절 사유 Top 5 자동 생성 로직 개발
-- [ ] 19. 공정성 지표 계산 모듈 (DI Ratio, Equalized Odds) · 점검 보고서에 측정값 있음, `src/fairness/` 미구현
-- [ ] 20. Bias Mitigation 구현 (Reweighting, Threshold Adjustment)
-- [ ] 21. FastAPI 서버 구현 (7개 엔드포인트) · `/health` 완료
-- [ ] 22. Pydantic 스키마 정의 및 Swagger UI 설정
-- [ ] 23. Streamlit 대시보드 구현 (5개 탭)
-- [ ] 24. API ↔ 대시보드 연동 테스트
+- [x] 15. ANOVA 통계 검증 모듈 개발 (2가지 검증 + Tukey HSD) · 1차 구현 (`src/statistics/anova.py`), 해석 리포트 남음
+- [ ] 16. SHAP TreeExplainer 적용 및 전역 해석 시각화 · TreeExplainer 적용, 전역은 Top 10 표시 중 (Summary Top 15 · Dependence Plot 이미지 남음)
+- [x] 17. SHAP 지역 해석 (Force Plot, Waterfall) 구현 · 대시보드 Waterfall
+- [x] 18. 거절 사유 Top 5 자동 생성 로직 개발
+- [ ] 19. 공정성 지표 계산 모듈 (DI Ratio, Equalized Odds) · API 는 점검 보고서 값을 사용, `src/fairness/` 계산 모듈 남음
+- [ ] 20. Bias Mitigation 구현 (Reweighting, Threshold Adjustment) · API·대시보드는 더미 값으로 연결됨
+- [x] 21. FastAPI 서버 구현 (7개 엔드포인트) · 더미 부분: Mitigation 후 지표, ROC/PR 곡선
+- [x] 22. Pydantic 스키마 정의 및 Swagger UI 설정
+- [x] 23. Streamlit 대시보드 구현 (5개 탭)
+- [x] 24. API ↔ 대시보드 연동 테스트
 - [x] 25. pytest 유닛 테스트 10개 이상 작성
-- [ ] 26. docker-compose.yml 작성 및 통합 테스트 (API + Dashboard + MLflow) · compose 작성 완료, 통합 테스트 남음
+- [x] 26. docker-compose.yml 작성 및 통합 테스트 (API + Dashboard + MLflow)
 - [ ] 27. 실험 리포트(PDF) 20페이지 이상 작성
 - [ ] 28. README.md 완성, GitHub Issue/PR 정리, 최종 점검
 
