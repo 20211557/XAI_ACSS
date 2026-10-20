@@ -4,7 +4,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.explainer.reasons import explain_sentence, ro_particle, short_label, subject_particle
+from src.explainer.reasons import (
+    NOT_RECOMMENDED_NOTE,
+    explain_sentence,
+    rejection_reasons,
+    ro_particle,
+    short_label,
+    subject_particle,
+)
 from src.statistics.anova import eta_squared, one_way_anova
 
 
@@ -52,6 +59,21 @@ def test_sentence_for_counts_flags_and_missing_values():
     )
     assert flag.startswith("월 소득 결측 표시에 해당합니다")
     assert "정보가 없어" in missing and "5,400" in missing
+
+
+def test_not_recommended_variables_are_marked_reference_only():
+    """README 팀원 연계: 권장 불가 변수는 조언이 아니라 '참고(변경 불가)' 로만 표시한다."""
+    reasons = rejection_reasons(
+        {"app_login_frequency": 0.5, "NumberRealEstateLoansOrLines": 0.3, "age": 0.2},
+        {"app_login_frequency": 12.0, "NumberRealEstateLoansOrLines": 0.0, "age": 27.0},
+        {"app_login_frequency": 23.0, "NumberRealEstateLoansOrLines": 1.0, "age": 52.0},
+    )
+    text = {r["feature"]: r["explanation"] for r in reasons}
+
+    assert NOT_RECOMMENDED_NOTE.strip() == "[참고(변경 불가)]"
+    assert text["app_login_frequency"].endswith(NOT_RECOMMENDED_NOTE)
+    assert text["NumberRealEstateLoansOrLines"].endswith(NOT_RECOMMENDED_NOTE)
+    assert "참고" not in text["age"]
 
 
 def test_eta_squared_matches_definition():

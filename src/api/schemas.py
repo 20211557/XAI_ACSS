@@ -126,6 +126,15 @@ class HealthResponse(BaseModel):
     status: str = Field(..., examples=["healthy"])
     model_version: str = Field(..., examples=["xgboost_v1.0"])
     model_available: bool = Field(..., description="model_version 에 해당하는 모델 파일 존재 여부")
+    trained_model_version: str | None = Field(
+        None,
+        examples=["xgboost_v1.0"],
+        description="최근 학습 결과(reports/final_summary.json)의 배포 모델",
+    )
+    model_version_match: bool | None = Field(
+        None,
+        description="model_version 과 trained_model_version 이 같은지 (학습 결과가 없으면 null)",
+    )
     timestamp: datetime
 
 

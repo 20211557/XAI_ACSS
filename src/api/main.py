@@ -106,10 +106,13 @@ app = FastAPI(
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 def health() -> HealthResponse:
+    trained = reports.trained_model_id()
     return HealthResponse(
         status="healthy",
         model_version=settings.model_id,
         model_available=settings.model_path.exists(),
+        trained_model_version=trained,
+        model_version_match=None if trained is None else trained == settings.model_id,
         timestamp=_now(),
     )
 
@@ -311,7 +314,7 @@ def metrics() -> MetricsResponse:
         default_rate=summary["default_rate_test"],
         rows=t["rows"],
         evaluated_on=summary["evaluated_on"],
-        model_version=f"{summary['winner']['model']}_v{summary['model_version']}",
+        model_version=reports.model_id(summary),
         confusion_matrix={
             **reports.confusion_matrix(summary),
             "note": "반올림된 test 지표(행 수, 부도율, 정밀도, 재현율)로 복원한 근사값 "

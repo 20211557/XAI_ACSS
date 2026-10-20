@@ -23,6 +23,8 @@ _COMPARE = {
     "개월": ("깁니다", "짧습니다"),
 }
 _DEFAULT_COMPARE = ("높습니다", "낮습니다")
+# 권장 불가 변수는 조언이 아니라 참고로만 표시한다 (README 팀원 연계, 거절 사유)
+NOT_RECOMMENDED_NOTE = " [참고(변경 불가)]"
 # 숫자를 한국어로 읽었을 때 받침이 있어 '으로' 가 붙는 끝자리 (영·십·백·천, 삼, 육)
 _DIGITS_WITH_BATCHIM = set("036")
 
@@ -124,7 +126,7 @@ def rejection_reasons(
             label, value, reference, contribution, cfg["value_format"].get(feature, {})
         )
         if action == "NOT_RECOMMENDED":
-            text += " [참고: 개선 권장 대상 아님]"
+            text += NOT_RECOMMENDED_NOTE
         reasons.append(
             {
                 "rank": rank,

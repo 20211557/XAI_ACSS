@@ -5,6 +5,7 @@ import json
 import math
 import sys
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -117,6 +118,26 @@ def test_mitigation_compares_real_before_with_dummy_after():
     assert body["before_is_dummy"] is False and body["after_is_dummy"] is True
     assert set(body["before"]) == set(body["after"]) == {"gender", "age_band"}
     assert body["after"]["age_band"]["di_ratio"] >= body["before"]["age_band"]["di_ratio"]
+
+
+def test_model_version_is_consistent_across_endpoints():
+    """/health 와 /metrics 가 같은 이름으로 최근 학습 결과(final_summary.json)의 모델을 가리킨다."""
+    health = client.get("/health").json()
+    metrics = client.get("/metrics").json()
+    shipped = Path(SUMMARY["model_file"]).stem
+
+    assert health["model_version"] == metrics["model_version"] == shipped
+    assert health["trained_model_version"] == shipped and health["model_version_match"] is True
+
+
+def test_health_flags_model_version_mismatch(monkeypatch):
+    from src.api import main
+
+    monkeypatch.setattr(main.settings, "model_version", "v9.9")
+    body = client.get("/health").json()
+
+    assert body["status"] == "healthy" and body["model_version"] == "xgboost_v9.9"
+    assert body["model_version_match"] is False
 
 
 def test_metrics_match_final_summary():

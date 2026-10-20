@@ -30,6 +30,19 @@ def read_csv(key: str) -> pd.DataFrame:
     return pd.read_csv(report_path(key))
 
 
+def model_id(summary: dict) -> str:
+    """배포 모델 식별자 = 모델 파일 이름 (예: models/xgboost_v1.0.joblib → xgboost_v1.0)."""
+    return Path(summary["model_file"]).stem
+
+
+def trained_model_id() -> str | None:
+    """최근 학습 결과(final_summary.json)의 배포 모델 식별자. 파일이 없으면 None."""
+    try:
+        return model_id(read_json("final_summary"))
+    except (FileNotFoundError, KeyError, ValueError):
+        return None
+
+
 def confusion_matrix(summary: dict) -> dict:
     """반올림된 test 지표(행 수, 부도율, 정밀도, 재현율)로 혼동행렬을 복원한다 (양성 = 부도 = 거절).
 

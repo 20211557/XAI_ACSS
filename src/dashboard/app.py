@@ -79,6 +79,12 @@ with st.sidebar:
         st.success(f"연결됨 · 모델 `{health['model_version']}`")
         if not health.get("model_available"):
             st.warning("학습된 모델 파일이 없습니다. 고객 심사와 XAI 분석은 사용할 수 없습니다.")
+        if health.get("model_version_match") is False:
+            st.warning(
+                f"API 모델 `{health['model_version']}` 이 최근 학습 결과 "
+                f"`{health['trained_model_version']}` 와 다릅니다 "
+                "(MODEL_NAME / MODEL_VERSION 확인)."
+            )
     except requests.RequestException:
         st.error(f"API 서버에 연결할 수 없습니다: {client.base_url}")
         st.stop()
