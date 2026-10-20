@@ -82,6 +82,9 @@ docker compose --profile dev run --rm dev python -m src.data.simulator
 
 # Model comparison → monotonic constraints → final model (about 15 minutes): models/xgboost_v1.0.joblib, reports/*.csv, final_summary.json
 docker compose --profile dev run --rm dev python -m src.models.train --stage all
+
+# Register the final model in the Model Registry: xai-credit-scoring, alias production (staging if a charter target is missed)
+docker compose --profile dev run --rm dev python -m src.models.registry
 ```
 
 Optional: reports, figures and checks, the actionability Excel, the German Credit secondary model (about 20 seconds)
@@ -219,7 +222,7 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 | `configs/data.yaml` | Cleaning rules (special codes, utilization threshold, minimum age) |
 | `configs/simulator.yaml` | The 8 alternative variables (distributions, observed / latent correlation targets, shared factor), credit link, `thin_filer_ratio` / `thin_filer_mode` / `bias_ratio`, thin-filer rules, age bands |
 | `configs/actionability.yaml` | Per-variable actionability class, direction, step, bounds, monotone sign, `dice_vary`, `model_feature`, notes (Korean and English) |
-| `configs/train.yaml` | Split (70/15/15), CV (5 × 5-fold), model grid, hyperparameters, winner rule, model version, MLflow experiments |
+| `configs/train.yaml` | Split (70/15/15), CV (5 × 5-fold), model grid, hyperparameters, winner rule, model version, MLflow experiments, Model Registry name and aliases |
 | `configs/scoring.yaml` | PD to score (0 to 1000), grades A to E, approval rule (score ≥ 475), recourse target (495) |
 | `configs/german.yaml` | German Credit secondary model |
 
@@ -238,7 +241,7 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 │   ├── config.py            # Environment variables (.env) + configs/config.yaml loader
 │   ├── utils/               # Shared utilities such as the logger
 │   ├── data/                # loader, preprocessor, simulator, features (thin-filer rule), actionability_table
-│   ├── models/              # train, evaluate, scoring, german, predictor (serving) (+ registry planned)
+│   ├── models/              # train, evaluate, scoring, german, registry (Model Registry), predictor (serving)
 │   ├── explainer/           # shap_explainer (TreeExplainer), reasons (rejection reason sentences)
 │   ├── fairness/            # DI ratio, equalized odds, bias mitigation
 │   ├── statistics/          # anova.py (one-way ANOVA, eta squared, Tukey HSD)
@@ -290,8 +293,8 @@ Every report also has a Korean version (`_ko`). The final experiment report (PDF
 
 **윤제진 (MLflow, Docker, FastAPI, Streamlit)**
 - [reports/mlflow_schema_en.md](reports/mlflow_schema_en.md): experiments (one per algorithm, plus final and audit), metric keys, the 21 input columns, how to load the model. Every model artifact has a signature and input example; the served model returns probabilities (column 1 = PD).
-- The training code uses the MLflow 3 API. Model stages are deprecated in MLflow 3, so mark the registered model with an alias (e.g. `production`, `staging`) or a tag.
-- To get the runs into the MLflow server, rerun training in the dev container (How to run, step 2).
+- **Model Registry:** `python -m src.models.registry` registers the latest `stage=final` run of experiment `nextstep-final` as `xai-credit-scoring`. Stages are deprecated in MLflow 3, so an alias marks the version: `production` when the run meets every charter target (AUC, KS, thin-filer lift, PSI, monotonic loss), `staging` when it misses one; a `staging` version leaves the current `production` version in place. Registering the same run again creates no new version. Settings: `mlflow.registry` in `configs/train.yaml`. Load with `mlflow.pyfunc.load_model("models:/xai-credit-scoring@production")`.
+- To get the runs and the registered model into the MLflow server, rerun training and the register command in the dev container (How to run, step 2).
 - The API loads `models/xgboost_v1.0.joblib` from `MODEL_NAME` / `MODEL_VERSION` (version in `configs/train.yaml`; also in `reports/final_summary.json` for `/health`). Use `src/models/scoring.py` for PD to score, grade and approval.
 
 ## Limitations

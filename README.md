@@ -84,6 +84,9 @@ docker compose --profile dev run --rm dev python -m src.data.simulator
 
 # 모델 비교 → 단조 제약 → 최종 모델 (약 15분): models/xgboost_v1.0.joblib, reports/*.csv, final_summary.json
 docker compose --profile dev run --rm dev python -m src.models.train --stage all
+
+# 최종 모델을 Model Registry 에 등록: xai-credit-scoring, alias production (헌장 목표 미달이면 staging)
+docker compose --profile dev run --rm dev python -m src.models.registry
 ```
 
 선택: 보고서·그림·점검, 조치 가능성 Excel, German Credit 보조 모델 (약 20초)
@@ -220,7 +223,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 | `configs/data.yaml` | 정제 규칙 (특수코드, 사용률 기준, 최소 연령) |
 | `configs/simulator.yaml` | 대안 변수 8개 (분포, 관측·잠재 상관 목표, 공통 요인), 신용 연결, `thin_filer_ratio` / `thin_filer_mode` / `bias_ratio`, 씬파일러 규칙, 연령대 |
 | `configs/actionability.yaml` | 변수별 조치 가능성 분류, 방향, 단위, 허용 범위, 단조 부호, `dice_vary`, `model_feature`, 비고 (한국어, 영어) |
-| `configs/train.yaml` | 분할 (70/15/15), 교차검증 (5 × 5겹), 모델 비교 조합, 하이퍼파라미터, 선정 규칙, 모델 버전, MLflow 실험 |
+| `configs/train.yaml` | 분할 (70/15/15), 교차검증 (5 × 5겹), 모델 비교 조합, 하이퍼파라미터, 선정 규칙, 모델 버전, MLflow 실험, Model Registry 이름·alias |
 | `configs/scoring.yaml` | PD → 점수(0~1000), 등급 A~E, 승인 규칙 (점수 475 이상), 경로 목표 (495) |
 | `configs/german.yaml` | German Credit 보조 모델 |
 
@@ -239,7 +242,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 │   ├── config.py            # 환경 변수(.env) + configs/config.yaml 로더
 │   ├── utils/               # 로거 등 공통 유틸
 │   ├── data/                # loader, preprocessor, simulator, features(씬파일러 판정), actionability_table
-│   ├── models/              # train, evaluate, scoring, german, predictor(서빙) (+ registry 예정)
+│   ├── models/              # train, evaluate, scoring, german, registry(Model Registry 등록), predictor(서빙)
 │   ├── explainer/           # shap_explainer (TreeExplainer), reasons (거절 사유 문장)
 │   ├── fairness/            # DI Ratio, Equalized Odds, Bias Mitigation
 │   ├── statistics/          # anova.py (One-way ANOVA, η², Tukey HSD)
@@ -291,8 +294,8 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 
 **윤제진 (MLflow, Docker, FastAPI, Streamlit)**
 - [reports/mlflow_schema_ko.md](reports/mlflow_schema_ko.md): 실험 (알고리즘별, final, audit), 지표 키, 입력 열 21개, 모델 불러오는 방법. 모든 모델 아티팩트에 signature 와 input example 이 있으며, 서빙 모델은 확률을 반환한다 (1번 열 = PD).
-- 학습 코드는 MLflow 3 API 를 사용한다. Model Registry 등록 시 stage 는 MLflow 3 에서 deprecated 이므로 alias(예: `production`, `staging`) 또는 태그로 표시한다.
-- MLflow 서버에 실험을 남기려면 dev 컨테이너에서 학습을 다시 실행한다 (위 실행 방법 2).
+- **Model Registry:** `python -m src.models.registry` 가 실험 `nextstep-final` 의 최신 `stage=final` 실행을 `xai-credit-scoring` 으로 등록한다. MLflow 3 에서 stage 는 deprecated 이므로 alias 를 쓴다. 헌장 목표(AUC, KS, 씬파일러 lift, PSI, 단조 손실)를 모두 충족하면 `production`, 하나라도 미달이면 `staging` 이며, `staging` 은 기존 `production` 버전을 바꾸지 않는다. 같은 실행을 다시 등록하면 새 버전을 만들지 않는다. 설정은 `configs/train.yaml` 의 `mlflow.registry`, 불러오기는 `mlflow.pyfunc.load_model("models:/xai-credit-scoring@production")`.
+- MLflow 서버에 실험과 등록 모델을 남기려면 dev 컨테이너에서 학습과 등록 명령을 다시 실행한다 (위 실행 방법 2).
 - API 는 `MODEL_NAME` / `MODEL_VERSION` 으로 `models/xgboost_v1.0.joblib` 을 로드한다 (버전은 `configs/train.yaml`, `/health` 용으로 `reports/final_summary.json` 에도 있음). PD → 점수·등급·승인 변환은 `src/models/scoring.py` 를 사용한다.
 
 ## 한계

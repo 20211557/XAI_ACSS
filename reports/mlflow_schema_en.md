@@ -41,13 +41,21 @@ Values: features = `gmsc`, `alt`, `both`; resampling = `none`, `class_weight`, `
 
 ```python
 import mlflow
-mlflow.set_tracking_uri("sqlite:///mlruns/mlflow.db")      # or the compose server
-model = mlflow.pyfunc.load_model("runs:/ab9fa56de2ee43f0823ce56096a9457b/model")
+mlflow.set_tracking_uri("http://localhost:5000")             # compose server (local: sqlite:///mlruns/mlflow.db)
+model = mlflow.pyfunc.load_model("models:/xai-credit-scoring@production")
 example = model.input_example                                 # DataFrame with the 21 columns
 pd_ = model.predict(example)[:, 1]                            # probability of default
 ```
 
-The run id changes on every retraining; find the final run by experiment `nextstep-final` and tag `stage=final`. Turn PD into score, grade and approval with `src/models/scoring.py` and `configs/scoring.yaml`. The Model Registry (Production / Staging) is 윤제진's part.
+The run id changes on every retraining, so load the registered model by its alias (see Model Registry below). Load a specific run's model with `runs:/<run_id>/model`; find the final run by experiment `nextstep-final` and tag `stage=final`. Turn PD into score, grade and approval with `src/models/scoring.py` and `configs/scoring.yaml`.
+
+## Model Registry
+
+- **Register:** after training, run `python -m src.models.registry` (dev container: `docker compose --profile dev run --rm dev python -m src.models.registry`). It registers the model of the latest run tagged `stage=final` in experiment `nextstep-final` as a new version of the registered model `xai-credit-scoring`. Registering the same run again reuses its version.
+- **Alias:** stages (Production / Staging) are deprecated in MLflow 3, so an alias marks the version: `production` when the run meets every charter target, `staging` when it misses one. A `staging` version leaves the current `production` version in place.
+- **Charter targets:** `test_auc` ≥ 0.78, `test_ks` ≥ 0.28, `test_thin_auc_lift` ≥ 0.03, `test_psi_trainval_vs_test` < 0.1 (`performance_targets` in `configs/config.yaml`), `mono_auc_loss` ≤ 0.01 (`monotonic.max_auc_loss` in `configs/train.yaml`). The last one does not apply to a model without monotonic constraints.
+- **Version tags:** `run_name`, `model_version`, `model_file`, `data_md5`, `test_auc`, `test_ks`, `charter_pass`, `charter_failed`.
+- The registered model name and aliases are in `mlflow.registry` of `configs/train.yaml`. The API loads `models/xgboost_v1.0.joblib`, not the registry.
 
 ## Input columns (21, this order, all numeric; NaN allowed)
 
