@@ -9,7 +9,7 @@
   - 체민규 (fairness, SHAP, DiCE recourse, cost function, ANOVA): needs `configs/actionability.yaml` + trained model.
   - 윤제진 (MLflow registry, Docker Compose, FastAPI, Streamlit).
 - Environment: Python 3.12 (Docker images and local). Pinned versions in requirements.txt match the shipped model (scikit-learn 1.9.1, xgboost 3.4.1, MLflow 3.16); retrain if you change them.
-- The shipped model was trained on macOS. Native Windows XGBoost cannot read its stored `rng_state` ("input stream corrupted"); the Linux containers can. On Windows, train and test in the dev container and never commit a Windows-trained model.
+- The shipped model was retrained in the Linux dev container on 2026-10-20 (same test metrics as Wonbin's original macOS model). Its runs and the registered model `xai-credit-scoring@production` live on the local compose MLflow server (`mlflow_data/`, not committed). Native Windows XGBoost could not read the macOS model's stored `rng_state` ("input stream corrupted"); the current model is untested on native Windows. On Windows, train and test in the dev container and never commit a Windows-trained model.
 
 ## Data (place in `data/raw/`, never commit)
 - GMSC: `cs-training.csv` (Kaggle "Give Me Some Credit"). Target: `SeriousDlqin2yrs`.
@@ -34,7 +34,7 @@
 - Monotonic constraints: only from the `monotone` field in the YAML (13 constraints). Model output = probability of default.
 - Scoring: approval at score >= 475 (fixed rule, scoring.yaml); recourse target 495.
 - Model file: models/xgboost_v1.0.joblib (version in configs/train.yaml). MLflow: one experiment per algorithm + final + audit; MLFLOW_TRACKING_URI.
-- Open items for teammates: age-band EO gap 0.121 > 0.10 (체민규); recourse coverage 87.9% < 90% at target 495 over 12 months (체민규, DiCE); grey zone around 475 (team); Model Registry (윤제진); ANOVA (체민규, data in reports/cv_fold_auc.csv).
+- Open items for teammates: age-band EO gap 0.121 > 0.10 (체민규); recourse coverage 87.9% < 90% at target 495 over 12 months (체민규, DiCE); grey zone around 475 (team); Model Registry (윤제진, done: src/models/registry.py); ANOVA (체민규, data in reports/cv_fold_auc.csv).
 
 ## Required targets (from the team charter)
 - AUC >= 0.78, KS >= 0.28, thin-filer AUC lift >= +0.03 (with vs. without alternative data), PSI < 0.1.
@@ -58,7 +58,7 @@ data/            raw/ (gitignored), processed/ (gitignored; split.csv defines th
 src/config.py    Settings from env/.env (ports, URLs, paths, MODEL_NAME/MODEL_VERSION) + config.yaml loader
 src/data/        loader.py, preprocessor.py, simulator.py, features.py (thin-filer rules, feature lists),
                  actionability_table.py
-src/models/      train.py, evaluate.py, scoring.py, german.py (registry.py planned)
+src/models/      train.py, evaluate.py, scoring.py, german.py, registry.py (Model Registry, alias production)
 src/explainer/, src/fairness/, src/statistics/   planned (체민규)
 src/api/, src/dashboard/                         FastAPI + Streamlit (윤제진); dashboard never loads models
 tests/

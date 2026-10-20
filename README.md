@@ -82,7 +82,7 @@ docker compose --profile dev run --rm dev python -m src.data
 # 대안 데이터 시뮬레이터: → data/processed/gmsc_sim.csv
 docker compose --profile dev run --rm dev python -m src.data.simulator
 
-# 모델 비교 → 단조 제약 → 최종 모델 (약 15분): models/xgboost_v1.0.joblib, reports/*.csv, final_summary.json
+# 모델 비교 → 단조 제약 → 최종 모델 (약 15~25분): models/xgboost_v1.0.joblib, reports/*.csv, final_summary.json
 docker compose --profile dev run --rm dev python -m src.models.train --stage all
 
 # 최종 모델을 Model Registry 에 등록: xai-credit-scoring, alias production (헌장 목표 미달이면 staging)
@@ -139,9 +139,11 @@ python -m src.models.train --stage all
 보기: `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`.
 로컬 `mlruns/` 를 컨테이너로 복사하지 않는다 (아티팩트 절대 경로가 저장되어 있음). Docker 에서는 학습을 다시 실행한다.
 
-> **Windows 주의:** 배포 모델은 macOS 에서 학습되어, Windows 용 XGBoost 는 모델에 저장된 난수 상태(`rng_state`)
-> 형식을 읽지 못한다 (`XGBoostError: input stream corrupted`). Linux 컨테이너(api·dev)에서는 정상으로 불러온다.
-> Windows 에서는 학습과 테스트를 dev 컨테이너에서 하고, Windows 에서 직접 학습한 모델은 커밋하지 않는다.
+> **Windows 주의:** 배포 모델은 Linux dev 컨테이너에서 학습했다 (2026-10-20, 김원빈의 macOS 모델과 test 지표 동일).
+> 이전 macOS 모델은 Windows 용 XGBoost 가 모델에 저장된 난수 상태(`rng_state`) 형식을 읽지 못했고
+> (`XGBoostError: input stream corrupted`), 현재 모델을 Windows 에서 직접 불러오는지는 확인하지 않았다.
+> Linux 컨테이너(api·dev)에서는 정상으로 불러온다. Windows 에서는 학습과 테스트를 dev 컨테이너에서 하고,
+> Windows 에서 직접 학습한 모델은 커밋하지 않는다.
 
 ### 테스트
 
@@ -159,7 +161,8 @@ pytest
   설정하지 않고, 데이터가 필요한 테스트는 건너뛴다. Linux 이므로 배포 모델을 불러오는 테스트는 실행된다.
 - MLflow 기록 검사(`tests/test_versioning_mlflow.py`)는 로컬 저장소 `mlruns/` 를 읽는다.
   MLflow 서버에만 기록한 경우 이 테스트는 건너뛴다 (`REQUIRE_DATA=1` 이면 실패).
-- Windows 에서 직접 실행하면 배포 모델을 불러오는 테스트 3개가 위 Windows 주의 때문에 실패한다. dev 컨테이너에서 실행한다.
+- Windows 에서 직접 실행하면 배포 모델을 불러오는 테스트가 위 Windows 주의 때문에 실패할 수 있다 (이전 macOS 모델에서는
+  3개 실패). dev 컨테이너에서 실행한다.
 
 ## API 엔드포인트
 

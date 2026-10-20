@@ -7,7 +7,7 @@
 - **기록 위치:** 환경 변수 `MLFLOW_TRACKING_URI`.
   - **설정하지 않거나 폴더 경로인 경우** (예: `./mlruns`): 프로젝트 루트 기준 `mlruns/mlflow.db` (로컬 SQLite), 아티팩트는 `mlruns/artifacts/`. MLflow 3.16이 일반 폴더 백엔드를 받지 않아 폴더 안에 데이터베이스를 둡니다.
   - **URI인 경우** (예: `http://mlflow:5000`): 그대로 사용하며, 아티팩트 위치는 서버가 정합니다.
-- **docker-compose 안에서는:** `MLFLOW_TRACKING_URI`를 compose의 MLflow 서버로 설정하고 **학습을 다시 실행**하십시오 (`python -m src.models.train --stage all`, 약 3분, 시드 고정). 로컬 `mlruns/` 폴더를 컨테이너로 복사하지 마십시오. 그 데이터베이스는 만들어진 컴퓨터의 **절대** 아티팩트 경로를 저장하므로 아티팩트를 찾을 수 없습니다.
+- **docker-compose 안에서는:** `MLFLOW_TRACKING_URI`를 compose의 MLflow 서버로 설정하고 **학습을 다시 실행**하십시오 (`python -m src.models.train --stage all`, 약 15~25분, 시드 고정). 로컬 `mlruns/` 폴더를 컨테이너로 복사하지 마십시오. 그 데이터베이스는 만들어진 컴퓨터의 **절대** 아티팩트 경로를 저장하므로 아티팩트를 찾을 수 없습니다.
 - `mlruns/`는 git에서 제외됩니다. 로컬에서 보기: `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`.
 
 ## 실험과 실행
@@ -82,3 +82,5 @@ pd_ = model.predict(example)[:, 1]                            # 부도 확률
 21. `app_login_frequency`
 
 `autopay_ratio`와 `gender_female`은 데이터셋에 있지만 모델 입력이 아닙니다.
+
+pyfunc(`models:/...`, `runs:/...`)로 예측할 때는 입력을 `float64`로 바꿔 넣으십시오 (`df.astype("float64")`). signature가 21열 모두 `double`이라, `age`처럼 정수(`int64`)인 열은 MLflow가 거부합니다 (`Can not safely convert int64 to float64`). joblib 파일을 직접 불러올 때는 필요 없습니다.
