@@ -41,13 +41,21 @@
 
 ```python
 import mlflow
-mlflow.set_tracking_uri("sqlite:///mlruns/mlflow.db")      # 또는 compose 서버
-model = mlflow.pyfunc.load_model("runs:/ab9fa56de2ee43f0823ce56096a9457b/model")
+mlflow.set_tracking_uri("http://localhost:5000")             # compose 서버 (로컬: sqlite:///mlruns/mlflow.db)
+model = mlflow.pyfunc.load_model("models:/xai-credit-scoring@production")
 example = model.input_example                                 # 21열 DataFrame
 pd_ = model.predict(example)[:, 1]                            # 부도 확률
 ```
 
-실행 ID는 다시 학습할 때마다 바뀌므로 실험 `nextstep-final`과 태그 `stage=final`로 최종 실행을 찾으십시오. PD를 점수, 등급, 승인으로 바꿀 때는 `src/models/scoring.py`와 `configs/scoring.yaml`을 사용합니다. 모델 레지스트리 (Production / Staging)는 윤제진 담당입니다.
+실행 ID는 다시 학습할 때마다 바뀌므로 등록 모델의 alias로 불러오십시오 (아래 모델 레지스트리). 특정 실행의 모델은 `runs:/<run_id>/model`로 불러오며, 최종 실행은 실험 `nextstep-final`과 태그 `stage=final`로 찾습니다. PD를 점수, 등급, 승인으로 바꿀 때는 `src/models/scoring.py`와 `configs/scoring.yaml`을 사용합니다.
+
+## 모델 레지스트리
+
+- **등록:** 학습 후 `python -m src.models.registry`를 실행합니다 (dev 컨테이너: `docker compose --profile dev run --rm dev python -m src.models.registry`). 실험 `nextstep-final`에서 태그 `stage=final`인 최신 실행의 모델을 등록 모델 `xai-credit-scoring`의 새 버전으로 등록합니다. 같은 실행을 다시 등록하면 기존 버전을 그대로 씁니다.
+- **alias:** MLflow 3에서 stage (Production / Staging)는 deprecated 이므로 alias를 씁니다. 헌장 목표를 모두 충족하면 `production`, 하나라도 미달이면 `staging`입니다. `staging`으로 등록해도 기존 `production` 버전은 바뀌지 않습니다.
+- **헌장 목표:** `test_auc` ≥ 0.78, `test_ks` ≥ 0.28, `test_thin_auc_lift` ≥ 0.03, `test_psi_trainval_vs_test` < 0.1 (`configs/config.yaml`의 `performance_targets`), `mono_auc_loss` ≤ 0.01 (`configs/train.yaml`의 `monotonic.max_auc_loss`). 단조 제약이 없는 모델에는 마지막 항목을 적용하지 않습니다.
+- **버전 태그:** `run_name`, `model_version`, `model_file`, `data_md5`, `test_auc`, `test_ks`, `charter_pass`, `charter_failed`.
+- 등록 모델 이름과 alias는 `configs/train.yaml`의 `mlflow.registry`에 있습니다. API는 레지스트리가 아니라 `models/xgboost_v1.0.joblib`을 불러옵니다.
 
 ## 입력 열 (21개, 이 순서, 모두 숫자, NaN 허용)
 

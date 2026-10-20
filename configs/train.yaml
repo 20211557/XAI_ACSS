@@ -44,6 +44,13 @@ mlflow:
     xgb: nextstep-xgb
     final: nextstep-final
     audit: nextstep-audit
+  # Model Registry (python -m src.models.registry): registers the latest run tagged stage=final.
+  # MLflow 3 deprecates stages, so an alias marks the version instead. Charter targets come from
+  # configs/config.yaml performance_targets and monotonic.max_auc_loss above.
+  registry:
+    model_name: xai-credit-scoring
+    alias: production                   # the final run meets every charter target
+    fallback_alias: staging             # it misses at least one target
 outputs:
   comparison: reports/model_comparison.csv
   cv_fold_auc: reports/cv_fold_auc.csv   # ANOVA handoff: run, model, features, resampling, repeat, fold, segment, n_rows, n_defaults, auc

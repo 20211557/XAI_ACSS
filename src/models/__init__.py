@@ -6,6 +6,6 @@
 - evaluate.py : AUC-ROC, KS, PSI, Precision/Recall/F1, 씬파일러 AUC uplift, 부트스트랩 신뢰구간
 - scoring.py  : 부도확률 → 신용 점수(0-1000) → 리스크 등급(A-E) → 승인 여부 (configs/scoring.yaml)
 - german.py   : German Credit 보조 모델 (실제 성별 공정성 점검용, python -m src.models.german)
-
-예정: registry.py (MLflow Model Registry 등록)
+- registry.py : 최종 실행을 MLflow Model Registry 에 등록
+                (alias production, 헌장 목표 미달이면 staging). 실행: python -m src.models.registry
 """
