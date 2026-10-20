@@ -152,8 +152,11 @@ pytest
 일부 테스트는 커밋되지 않는 파일(`data/processed/*.csv`, `mlruns/`)이 필요하다. 위 파이프라인 명령으로 만든다.
 
 - **기본값:** 해당 파일이 없으면 그 테스트는 실행할 명령을 알려주는 메시지와 함께 **건너뛴다(skip)**.
-- **`REQUIRE_DATA=1`:** 파일이 없으면 해당 테스트가 건너뛰지 않고 **실패**한다. CI 와 최종 점검에서 설정한다.
-  dev 컨테이너에는 `.env` 의 `REQUIRE_DATA` 가 전달된다.
+- **`REQUIRE_DATA=1`:** 파일이 없으면 해당 테스트가 건너뛰지 않고 **실패**한다. 데이터를 넣고 위 파이프라인을 실행한
+  dev 컨테이너에서 최종 점검할 때 설정한다. dev 컨테이너에는 `.env` 의 `REQUIRE_DATA` 가 전달된다.
+- **CI (GitHub Actions, `.github/workflows/tests.yml`):** PR 과 `main` push 마다 Python 3.12 에서
+  `pip install -r requirements-dev.txt` 후 `pytest` 를 실행한다. CI 에는 원본 데이터가 없으므로 `REQUIRE_DATA` 를
+  설정하지 않고, 데이터가 필요한 테스트는 건너뛴다. Linux 이므로 배포 모델을 불러오는 테스트는 실행된다.
 - MLflow 기록 검사(`tests/test_versioning_mlflow.py`)는 로컬 저장소 `mlruns/` 를 읽는다.
   MLflow 서버에만 기록한 경우 이 테스트는 건너뛴다 (`REQUIRE_DATA=1` 이면 실패).
 - Windows 에서 직접 실행하면 배포 모델을 불러오는 테스트 3개가 위 Windows 주의 때문에 실패한다. dev 컨테이너에서 실행한다.
@@ -231,6 +234,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 
 ```
 .
+├── .github/                 # PR·이슈 템플릿, workflows/tests.yml (CI: PR 마다 pytest)
 ├── configs/                 # 설정 YAML (위 표)
 ├── data/                    # raw/ · processed/ (git 미추적, data/README.md 참고)
 ├── docs/                    # 실험 리포트 (experiment_report.pdf)
@@ -312,6 +316,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 
 - **브랜치**: `main` 은 항상 실행 가능한 상태로 유지하고, 작업은 `feat/<주제>`, `fix/<주제>`, `docs/<주제>` 브랜치에서 한다.
 - **이슈 → PR**: 작업마다 이슈를 만들고(`.github/ISSUE_TEMPLATE`), PR 본문에 `closes #이슈번호` 를 적어 연결한다.
+- **CI**: PR 마다 GitHub Actions 가 `pytest` 를 실행한다. 통과한 PR 만 `main` 에 병합한다.
 - **커밋 메시지**: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `build:` 접두어를 사용한다.
 - **설정값**: 포트·경로·임계값은 `.env` 또는 `configs/*.yaml` 에 두고 코드에 하드코딩하지 않는다.
 - **문서**: README 와 `reports/*.md` 는 한국어·영어 두 버전을 두고 면책 조항을 넣는다 (`tests/test_docs.py` 가 검사).

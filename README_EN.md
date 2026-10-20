@@ -151,8 +151,11 @@ pytest
 Some tests need files that are not committed (`data/processed/*.csv`, `mlruns/`). Create them with the pipeline commands above.
 
 - **Default:** if those files are missing, the tests that need them are **skipped** with a message saying which command to run.
-- **`REQUIRE_DATA=1`:** missing files make those tests **fail** instead. Set it in CI and for the final check.
-  The dev container receives `REQUIRE_DATA` from `.env`.
+- **`REQUIRE_DATA=1`:** missing files make those tests **fail** instead. Set it for the final check in the dev
+  container, after adding the data and running the pipeline above. The dev container receives `REQUIRE_DATA` from `.env`.
+- **CI (GitHub Actions, `.github/workflows/tests.yml`):** on every PR and every push to `main`, runs
+  `pip install -r requirements-dev.txt` and then `pytest` on Python 3.12. CI has no raw data, so `REQUIRE_DATA` is not
+  set and the tests that need data are skipped. CI runs on Linux, so the tests that load the shipped model do run.
 - The MLflow tracking checks (`tests/test_versioning_mlflow.py`) read the local store `mlruns/`.
   If runs were logged only to the MLflow server, these tests are skipped (they fail with `REQUIRE_DATA=1`).
 - Run natively on Windows, the 3 tests that load the shipped model fail because of the Windows note above. Use the dev container.
@@ -230,6 +233,7 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 
 ```
 .
+├── .github/                 # PR and issue templates, workflows/tests.yml (CI: pytest on every PR)
 ├── configs/                 # Settings YAML (table above)
 ├── data/                    # raw/ and processed/ (not committed, see data/README.md)
 ├── docs/                    # Experiment report (experiment_report.pdf)
@@ -311,6 +315,7 @@ Every report also has a Korean version (`_ko`). The final experiment report (PDF
 
 - **Branches**: keep `main` runnable at all times; work on `feat/<topic>`, `fix/<topic>`, `docs/<topic>` branches.
 - **Issue → PR**: open an issue per task (`.github/ISSUE_TEMPLATE`) and link it with `closes #<issue>` in the PR body.
+- **CI**: GitHub Actions runs `pytest` on every PR. Merge into `main` only when it passes.
 - **Commit messages**: use the prefixes `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`, `build:`.
 - **Settings**: ports, paths and thresholds go in `.env` or `configs/*.yaml`, never hard-coded.
 - **Documents**: the README and `reports/*.md` exist in Korean and English and carry the disclaimer (`tests/test_docs.py` checks this).

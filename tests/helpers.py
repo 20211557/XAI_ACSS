@@ -1,6 +1,7 @@
 """Shared test helpers. Data files are gitignored, so tests that need them skip by default.
 
-Set REQUIRE_DATA=1 (Docker, CI) to make those tests fail instead of skip.
+Set REQUIRE_DATA=1 (final check in the dev container, with data) to make those tests fail instead
+of skip. CI has no raw data, so it leaves REQUIRE_DATA unset and those tests skip.
 """
 from __future__ import annotations
 
