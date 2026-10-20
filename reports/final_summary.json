@@ -119,5 +119,5 @@
     "xgboost.sklearn.XGBClassifier"
   ],
   "mlflow_run_name": "xgb__both__none__mono-full__final",
-  "mlflow_run_id": "8748ee1f6a264ac5904435379a52614e"
+  "mlflow_run_id": "c601dc7aa5754b8ebe9c201018c6c835"
 }

@@ -80,7 +80,7 @@ docker compose --profile dev run --rm dev python -m src.data
 # Alternative-data simulator: → data/processed/gmsc_sim.csv
 docker compose --profile dev run --rm dev python -m src.data.simulator
 
-# Model comparison → monotonic constraints → final model (about 15 minutes): models/xgboost_v1.0.joblib, reports/*.csv, final_summary.json
+# Model comparison → monotonic constraints → final model (about 15 to 25 minutes): models/xgboost_v1.0.joblib, reports/*.csv, final_summary.json
 docker compose --profile dev run --rm dev python -m src.models.train --stage all
 
 # Register the final model in the Model Registry: xai-credit-scoring, alias production (staging if a charter target is missed)
@@ -137,10 +137,11 @@ If `MLFLOW_TRACKING_URI` is not set in the shell, runs go to the local SQLite st
 View it with `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`.
 Do not copy a local `mlruns/` into a container (it stores absolute artifact paths); rerun training in Docker instead.
 
-> **Windows note:** the shipped model was trained on macOS, and the Windows build of XGBoost cannot read the
-> format of the random-number state (`rng_state`) stored in it (`XGBoostError: input stream corrupted`). The Linux
-> containers (api, dev) load it fine. On Windows, train and test in the dev container, and never commit a model
-> trained natively on Windows.
+> **Windows note:** the shipped model was trained in the Linux dev container (2026-10-20; same test metrics as
+> 김원빈's original macOS model). The Windows build of XGBoost could not read the format of the random-number state
+> (`rng_state`) stored in the earlier macOS model (`XGBoostError: input stream corrupted`); loading the current
+> model natively on Windows has not been tested. The Linux containers (api, dev) load it fine. On Windows, train and
+> test in the dev container, and never commit a model trained natively on Windows.
 
 ### Tests
 
@@ -158,7 +159,8 @@ Some tests need files that are not committed (`data/processed/*.csv`, `mlruns/`)
   set and the tests that need data are skipped. CI runs on Linux, so the tests that load the shipped model do run.
 - The MLflow tracking checks (`tests/test_versioning_mlflow.py`) read the local store `mlruns/`.
   If runs were logged only to the MLflow server, these tests are skipped (they fail with `REQUIRE_DATA=1`).
-- Run natively on Windows, the 3 tests that load the shipped model fail because of the Windows note above. Use the dev container.
+- Run natively on Windows, the tests that load the shipped model may fail because of the Windows note above (3 failed
+  with the earlier macOS model). Use the dev container.
 
 ## API endpoints
 

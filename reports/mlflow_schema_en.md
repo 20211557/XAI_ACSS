@@ -7,7 +7,7 @@
 - **Tracking location:** the environment variable `MLFLOW_TRACKING_URI`.
   - **Unset, or a folder path** (e.g. `./mlruns`): a local SQLite database `mlruns/mlflow.db`, with artifacts in `mlruns/artifacts/`, relative to the project root. MLflow 3.16 refuses the plain folder backend, which is why the folder holds a database.
   - **A URI** (for example `http://mlflow:5000`): used as is; the server decides where artifacts go.
-- **Inside docker-compose:** set `MLFLOW_TRACKING_URI` to the compose MLflow server and **rerun training** (`python -m src.models.train --stage all`, about 3 minutes, seeded). Do not copy the local `mlruns/` folder into a container: its database stores **absolute** artifact paths from the machine where it was created, so the artifacts would not be found.
+- **Inside docker-compose:** set `MLFLOW_TRACKING_URI` to the compose MLflow server and **rerun training** (`python -m src.models.train --stage all`, about 15 to 25 minutes, seeded). Do not copy the local `mlruns/` folder into a container: its database stores **absolute** artifact paths from the machine where it was created, so the artifacts would not be found.
 - `mlruns/` is gitignored. Browse it locally with `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`.
 
 ## Experiments and runs
@@ -82,3 +82,5 @@ The run id changes on every retraining, so load the registered model by its alia
 21. `app_login_frequency`
 
 `autopay_ratio` and `gender_female` are in the dataset but are not model inputs.
+
+When predicting through pyfunc (`models:/...`, `runs:/...`), cast the input to `float64` (`df.astype("float64")`). The signature types all 21 columns as `double`, so MLflow rejects integer (`int64`) columns such as `age` (`Can not safely convert int64 to float64`). Loading the joblib file directly does not need this.
