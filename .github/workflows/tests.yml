@@ -1,0 +1,42 @@
+# Run pytest on every pull request and on every push to main.
+#
+# The raw data (data/raw/cs-training.csv) is not in the repo (Kaggle license), so tests that
+# need data/processed/*.csv or mlruns/ are skipped here (REQUIRE_DATA is not set).
+# Tests that load the committed model do run: Linux XGBoost reads the shipped model
+# (see README, Windows note). The full check with data (REQUIRE_DATA=1) runs in the dev container.
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to the same branch or PR cancels the run that is still going
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"   # same as the Docker images (Dockerfile PYTHON_VERSION)
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest
