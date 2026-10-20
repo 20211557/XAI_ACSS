@@ -154,6 +154,31 @@ Some tests need files that are not committed (`data/processed/*.csv`, `mlruns/`)
   If runs were logged only to the MLflow server, these tests are skipped (they fail with `REQUIRE_DATA=1`).
 - Run natively on Windows, the 3 tests that load the shipped model fail because of the Windows note above. Use the dev container.
 
+## API endpoints
+
+Swagger UI: http://localhost:8000/docs (with request examples). Values with `is_dummy: true` cannot be computed yet and
+are placeholders; the dashboard marks them 🟡 **dummy data** (`src/api/dummy.py`).
+
+| Endpoint | Method | Returns | Data |
+| --- | --- | --- | --- |
+| `/health` | GET | Status, model version | Real |
+| `/predict` | POST | Credit score (0 to 1000), approval, default probability, risk grade (A to E), thin-filer flag | Real (shipped model) |
+| `/explain` | POST | Top 5 rejection reasons (feature, current_value, shap_contribution, explanation), SHAP per feature | Real (shipped model + SHAP) |
+| `/fairness` | GET | DI ratio and equalized odds (TPR/FPR gaps) by gender and age band, approval rate per group | Real (`reports/audit/2_fairness.json`) |
+| `/fairness/mitigation` | GET | Before/after mitigation | Before: real, **after: dummy** (until `src/fairness` exists) |
+| `/metrics` | GET | AUC, KS, precision, recall, F1, confusion matrix, grade table | Real (`reports/final_summary.json`); **ROC/PR curve points: dummy** |
+| `/anova` | GET | Two one-way ANOVAs (F, p, eta squared), Tukey HSD | Real (`reports/cv_fold_auc.csv`) |
+| `/explain/global` | GET | Global SHAP importance (for the dashboard) | Real (top 10, `reports/shap_global_top10.csv`) |
+| `/features` | GET | Input variables with labels, ranges, defaults (for the dashboard form) | Real |
+
+- Customer JSON keys are the training column names (e.g. `NumberOfTimes90DaysLate`). `null` means missing and is imputed with
+  the training median; raw inputs go through the same cleaning rules as training (codes 96/98, missing or zero income,
+  utilization outliers) in `src/models/predictor.py`.
+- `shap_contribution` in the rejection reasons follows the mission example (approval direction, negative = toward rejection).
+  The reference value is the training median.
+- `/predict` takes about 0.03 seconds (the model and SHAP explainer are loaded at startup).
+- The ANOVA definitions (group, filter, labels) live in `statistics.anova` in `configs/config.yaml`.
+
 ## Model results (official: test set, shipped model `models/xgboost_v1.0.joblib`)
 
 XGBoost, 21 features, no resampling, 13 monotonic constraints; trained on train + validation, evaluated once on the 15% test set. 95% bootstrap intervals.
@@ -213,11 +238,11 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 │   ├── config.py            # Environment variables (.env) + configs/config.yaml loader
 │   ├── utils/               # Shared utilities such as the logger
 │   ├── data/                # loader, preprocessor, simulator, features (thin-filer rule), actionability_table
-│   ├── models/              # train, evaluate, scoring, german (+ registry planned)
-│   ├── explainer/           # SHAP explanations, rejection reasons
+│   ├── models/              # train, evaluate, scoring, german, predictor (serving) (+ registry planned)
+│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (rejection reason sentences)
 │   ├── fairness/            # DI ratio, equalized odds, bias mitigation
-│   ├── statistics/          # anova.py (one-way ANOVA, Tukey HSD)
-│   ├── api/                 # FastAPI (main.py, schemas.py)
+│   ├── statistics/          # anova.py (one-way ANOVA, eta squared, Tukey HSD)
+│   ├── api/                 # FastAPI (main.py, schemas.py, reports.py, dummy.py)
 │   └── dashboard/           # Streamlit (app.py, api_client.py)
 ├── tests/                   # pytest suite
 ├── Dockerfile               # Multi-stage: mlflow / api / dashboard / dev
@@ -261,6 +286,7 @@ Every report also has a Korean version (`_ko`). The final experiment report (PDF
 - DiCE should link income and debt ratio (raising income lowers the ratio).
 - ANOVA data: `reports/cv_fold_auc.csv` (5 × 5 folds, segments all / thin / general) and [reports/anova_handoff_en.md](reports/anova_handoff_en.md).
 - Real-gender check: `reports/german/oof_predictions.csv` (see [reports/german_report_en.md](reports/german_report_en.md)).
+- **Where the API and dashboard plug in:** rejection reasons (`src/explainer/reasons.py`) and ANOVA (`src/statistics/anova.py`) are first versions; change them freely. Once bias mitigation exists, wire its result into `/fairness/mitigation` in place of `mitigated()` in `src/api/dummy.py`.
 
 **윤제진 (MLflow, Docker, FastAPI, Streamlit)**
 - [reports/mlflow_schema_en.md](reports/mlflow_schema_en.md): experiments (one per algorithm, plus final and audit), metric keys, the 21 input columns, how to load the model. Every model artifact has a signature and input example; the served model returns probabilities (column 1 = PD).
