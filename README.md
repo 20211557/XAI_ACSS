@@ -41,9 +41,9 @@ flowchart LR
 | 이름 | 역할 | 담당 |
 | --- | --- | --- |
 | 김원빈 | 데이터 · 모델링 | 데이터 로드·정제, 대안 데이터 시뮬레이터, 씬파일러 판정, 변수별 조치 가능성, 모델 비교·단조 제약 학습, PD → 점수 변환 |
-| 체민규 | XAI · 공정성 · 통계 | SHAP 해석·거절 사유, DiCE 경로·비용 함수, 공정성 검증·Bias Mitigation, ANOVA |
+| 채민규 | XAI · 공정성 · 통계 | SHAP 해석·거절 사유, DiCE 경로·비용 함수, 공정성 검증·Bias Mitigation, ANOVA |
 | 윤제진 | MLOps · 서빙 | Docker 환경, MLflow 서버·Model Registry, FastAPI, Streamlit 대시보드 |
-| 아만지 | PM | 보고서, 발표, 회의록, 멘토 소통 |
+| 이민지 | PM | 보고서, 발표, 회의록, 멘토 소통 |
 
 ## 실행 방법
 
