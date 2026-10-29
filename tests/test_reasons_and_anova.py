@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from src.explainer.reasons import (
-    NOT_RECOMMENDED_NOTE,
+    REFERENCE_NOTE,
     explain_sentence,
     rejection_reasons,
     ro_particle,
@@ -61,19 +61,28 @@ def test_sentence_for_counts_flags_and_missing_values():
     assert "정보가 없어" in missing and "5,400" in missing
 
 
-def test_not_recommended_variables_are_marked_reference_only():
-    """README 팀원 연계: 권장 불가 변수는 조언이 아니라 '참고(변경 불가)' 로만 표시한다."""
+def test_unchangeable_variables_are_marked_reference_only():
+    """권장 불가, 불변, 감소 불가 변수는 조언이 아니라 '참고(변경 불가)' 로만 표시한다
+    (configs/actionability.yaml 의 분류 정의). 조치 가능, 시간 의존 변수에는 붙이지 않는다."""
+    features = {
+        "app_login_frequency": (0.5, 12.0, 23.0),  # NOT_RECOMMENDED
+        "age": (0.4, 27.0, 52.0),  # IMMUTABLE
+        "NumberOfTimes90DaysLate": (0.3, 1.0, 0.0),  # NON_DECREASING
+        "RevolvingUtilizationOfUnsecuredLines": (0.2, 0.9, 0.15),  # ACTIONABLE
+        "insurance_paid_months": (0.1, 10.0, 18.0),  # TIME_ONLY
+    }
     reasons = rejection_reasons(
-        {"app_login_frequency": 0.5, "NumberRealEstateLoansOrLines": 0.3, "age": 0.2},
-        {"app_login_frequency": 12.0, "NumberRealEstateLoansOrLines": 0.0, "age": 27.0},
-        {"app_login_frequency": 23.0, "NumberRealEstateLoansOrLines": 1.0, "age": 52.0},
+        {f: v[0] for f, v in features.items()},
+        {f: v[1] for f, v in features.items()},
+        {f: v[2] for f, v in features.items()},
     )
     text = {r["feature"]: r["explanation"] for r in reasons}
 
-    assert NOT_RECOMMENDED_NOTE.strip() == "[참고(변경 불가)]"
-    assert text["app_login_frequency"].endswith(NOT_RECOMMENDED_NOTE)
-    assert text["NumberRealEstateLoansOrLines"].endswith(NOT_RECOMMENDED_NOTE)
-    assert "참고" not in text["age"]
+    assert REFERENCE_NOTE.strip() == "[참고(변경 불가)]"
+    for f in ("app_login_frequency", "age", "NumberOfTimes90DaysLate"):
+        assert text[f].endswith(REFERENCE_NOTE), f
+    for f in ("RevolvingUtilizationOfUnsecuredLines", "insurance_paid_months"):
+        assert "참고" not in text[f], f
 
 
 def test_eta_squared_matches_definition():

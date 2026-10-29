@@ -27,9 +27,19 @@ performance_targets:
 explainer:
   summary_top_features: 15
   dependence_plot_min_features: 2
+  # Dependence Plot 변수 (python -m src.explainer.global_shap). 조치 가능 변수 1위, 전통 신용 변수,
+  # 보호 속성(공정성 보고서와 연결), 단조 제약 연체 변수
+  dependence_features:
+    - spending_consistency
+    - RevolvingUtilizationOfUnsecuredLines
+    - age
+    - NumberOfTimes90DaysLate
   rejection_reasons_top_k: 5
   rejection_reasons_min: 3
   rejection_reason_min_contribution: 0.01   # |기여도| 가 이보다 작은 변수는 거절 사유에서 뺀다 (log-odds)
+  # 거절 사유에서 조언이 아니라 '[참고(변경 불가)]' 로만 표시할 조치 가능성 분류
+  # (configs/actionability.yaml: 권장 불가, 불변, 감소 불가)
+  reference_only_classes: [NOT_RECOMMENDED, IMMUTABLE, NON_DECREASING]
   # 거절 사유 문장의 값 표시 (kind: pct | count | money | decimal | flag). 비교 기준은 배포 모델의
   # 학습 데이터 중앙값 (파이프라인 imputer 의 statistics_)
   value_format:
@@ -58,10 +68,21 @@ explainer:
 fairness:
   protected_attributes:
     gender: [male, female]             # 시뮬레이션 값 (configs/simulator.yaml 의 gender)
-    age_group: ["20-34", "35-54", "55+"]
+    age_band: ["20-34", "35-54", "55+"]  # configs/simulator.yaml 의 age_bands
   di_ratio_bounds: [0.8, 1.25]         # 범위를 벗어나면 WARNING 로그
   equalized_odds_max_diff: 0.10        # TPR/FPR 차이 허용 상한
   default_attribute: gender            # GET /fairness 의 기본 보호 속성 (gender | age_band)
+  output: fairness/fairness_metrics.json  # python -m src.fairness 결과 (REPORTS_DIR 기준)
+  # Bias Mitigation (python -m src.fairness.mitigation). 기준점은 validation 에서 고르고 test 에서 보고한다
+  mitigation:
+    attribute: age_band                # 완화 대상 보호 속성 (EO 기준 미달)
+    # Threshold Adjustment: 집단별 승인 기준점 후보. 조건(EO, DI, 승인자 부도율 유지)을 지키는
+    # 조합 중 승인율이 가장 높은 것을 고른다
+    cutoff_grid: {min: 400, max: 550, step: 5}
+    output: fairness/mitigation.json
+    # GET /fairness/mitigation 의 '적용 후' 로 내보낼 방법 (reweighting | threshold_adjustment).
+    # 두 방법의 결과는 모두 output 파일에 있다
+    api_method: reweighting
 
 statistics:
   alpha: 0.05
@@ -76,10 +97,12 @@ statistics:
       group: features
       filter: {segment: all}
       labels: {gmsc: 전통 Only, alt: 대안 Only, both: 통합}
+    # 통합 피처만 비교한다. 피처 그룹을 섞으면 그 차이(AUC 0.86~0.94)가 집단 안 변동이 되어
+    # 알고리즘 차이(약 0.002)를 가린다 (reports/anova_report_ko.md 3절)
     test_2:
-      name: 알고리즘별 AUC 비교 (One-way ANOVA)
+      name: 알고리즘별 AUC 비교, 통합 피처 (One-way ANOVA)
       group: model
-      filter: {segment: all}
+      filter: {segment: all, features: both}
       labels: {lr: LogisticRegression, xgb: XGBoost, lgbm: LightGBM}
 
 api:
@@ -88,7 +111,8 @@ api:
     final_summary: final_summary.json      # src/models/train.py (configs/train.yaml outputs)
     grade_table: grade_table.csv           # src/models/train.py
     cv_fold_auc: cv_fold_auc.csv           # src/models/train.py
-    fairness_audit: audit/2_fairness.json  # notebooks/audit.py
+    fairness_metrics: fairness/fairness_metrics.json  # python -m src.fairness
+    fairness_mitigation: fairness/mitigation.json     # python -m src.fairness.mitigation
     shap_global: shap_global_top10.csv     # notebooks/model_report.py
   curve_points: 50                         # ROC / PR 곡선 좌표 수
 

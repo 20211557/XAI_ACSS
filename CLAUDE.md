@@ -34,7 +34,7 @@
 - Monotonic constraints: only from the `monotone` field in the YAML (13 constraints). Model output = probability of default.
 - Scoring: approval at score >= 475 (fixed rule, scoring.yaml); recourse target 495.
 - Model file: models/xgboost_v1.0.joblib (version in configs/train.yaml). MLflow: one experiment per algorithm + final + audit; MLFLOW_TRACKING_URI.
-- Open items for teammates: age-band EO gap 0.121 > 0.10 (체민규); recourse coverage 87.9% < 90% at target 495 over 12 months (체민규, DiCE); grey zone around 475 (team); Model Registry (윤제진, done: src/models/registry.py); ANOVA (체민규, data in reports/cv_fold_auc.csv).
+- Open items for teammates: age-band EO gap 0.121 > 0.10 (체민규, mitigated in src/fairness: reweighting 0.025, not deployed; reports/fairness_report_ko.md); recourse coverage 87.9% < 90% at target 495 over 12 months (체민규, DiCE); grey zone around 475 (team); Model Registry (윤제진, done: src/models/registry.py); ANOVA (체민규, done: reports/anova_report_ko.md; test 2 compares algorithms within combined features).
 
 ## Required targets (from the team charter)
 - AUC >= 0.78, KS >= 0.28, thin-filer AUC lift >= +0.03 (with vs. without alternative data), PSI < 0.1.
