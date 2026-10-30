@@ -101,6 +101,21 @@ docker compose --profile dev run --rm dev python -m src.data.actionability_table
 docker compose --profile dev run --rm dev python -m src.models.german
 ```
 
+공정성 검증과 Bias Mitigation (배포 모델로 test 세트를 예측하므로 학습이 필요 없음. API 가 읽는 `reports/fairness/*.json` 생성)
+
+```bash
+docker compose --profile dev run --rm dev python -m src.fairness              # 몇 초
+docker compose --profile dev run --rm dev python -m src.fairness.mitigation   # 약 1~2분 (가중치 재학습 포함)
+```
+
+전역 SHAP 그림 (Summary Plot 상위 15개, Dependence Plot → `reports/figures/13_*`, `14_*`, 한/영). dev 컨테이너에는
+한글 폰트가 없으므로 호스트의 폰트 파일을 넘긴다 (예: Windows 의 나눔고딕. macOS 는 AppleGothic 이 있으면 생략 가능).
+
+```bash
+docker compose --profile dev run --rm -v C:/Windows/Fonts/NanumGothic.ttf:/fonts/ko.ttf:ro \
+  -e KO_FONT_PATH=/fonts/ko.ttf dev python -m src.explainer.global_shap   # 약 10초
+```
+
 ### 3. 개발 환경 (dev 컨테이너)
 
 Python 3.12 와 전체 라이브러리가 설치된 컨테이너에 레포 전체가 `/app` 으로 마운트된다.
@@ -174,8 +189,8 @@ Swagger UI: http://localhost:8000/docs (요청 예시 포함). 응답의 `is_dum
 | `/health` | GET | 상태, 모델 버전 | 실제 |
 | `/predict` | POST | 신용 점수(0~1000), 승인 여부, 부도 확률, 리스크 등급(A~E), 씬파일러 여부 | 실제 (배포 모델) |
 | `/explain` | POST | 거절 사유 Top 5 (feature, current_value, shap_contribution, explanation), 변수별 SHAP | 실제 (배포 모델 + SHAP) |
-| `/fairness` | GET | 성별·연령대 DI Ratio, Equalized Odds (TPR/FPR 차이), 집단별 승인율 | 실제 (`reports/audit/2_fairness.json`) |
-| `/fairness/mitigation` | GET | Mitigation 전/후 비교 | 전: 실제, **후: 더미** (`src/fairness` 구현 전) |
+| `/fairness` | GET | 성별·연령대 DI Ratio, Equalized Odds (TPR/FPR 차이), 집단별 승인율 | 실제 (`reports/fairness/fairness_metrics.json`) |
+| `/fairness/mitigation` | GET | Mitigation 전/후 비교 (적용 후 = 가중치 재학습, 성능 변화는 `note`) | 실제 (`reports/fairness/mitigation.json`) |
 | `/metrics` | GET | AUC, KS, Precision, Recall, F1, 혼동행렬, 등급표 | 실제 (`reports/final_summary.json`), **ROC/PR 곡선 좌표: 더미** |
 | `/anova` | GET | One-way ANOVA 2종 (F, p, η²), Tukey HSD | 실제 (`reports/cv_fold_auc.csv`) |
 | `/explain/global` | GET | 전역 SHAP 중요도 (대시보드용) | 실제 (Top 10, `reports/shap_global_top10.csv`) |
@@ -225,7 +240,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 
 | 파일 | 내용 |
 | --- | --- |
-| `configs/config.yaml` | 과제 성능 목표, 면책 조항, XAI(Top 15, 거절 사유 5개), 공정성(보호 속성, DI 0.8~1.25, EO 0.10), 통계(α, η² 기준) |
+| `configs/config.yaml` | 과제 성능 목표, 면책 조항, XAI(Top 15, 거절 사유 5개), 공정성(보호 속성, DI 0.8~1.25, EO 0.10, Mitigation 대상·기준점 후보·API 표시 방법), 통계(α, η² 기준) |
 | `configs/data.yaml` | 정제 규칙 (특수코드, 사용률 기준, 최소 연령) |
 | `configs/simulator.yaml` | 대안 변수 8개 (분포, 관측·잠재 상관 목표, 공통 요인), 신용 연결, `thin_filer_ratio` / `thin_filer_mode` / `bias_ratio`, 씬파일러 규칙, 연령대 |
 | `configs/actionability.yaml` | 변수별 조치 가능성 분류, 방향, 단위, 허용 범위, 단조 부호, `dice_vary`, `model_feature`, 비고 (한국어, 영어) |
@@ -250,7 +265,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 │   ├── utils/               # 로거 등 공통 유틸
 │   ├── data/                # loader, preprocessor, simulator, features(씬파일러 판정), actionability_table
 │   ├── models/              # train, evaluate, scoring, german, registry(Model Registry 등록), predictor(서빙)
-│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (거절 사유 문장)
+│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (거절 사유 문장), global_shap (전역 그림)
 │   ├── fairness/            # DI Ratio, Equalized Odds, Bias Mitigation
 │   ├── statistics/          # anova.py (One-way ANOVA, η², Tukey HSD)
 │   ├── api/                 # FastAPI (main.py, schemas.py, reports.py, dummy.py)
@@ -277,8 +292,11 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 | 대체 데이터 시뮬레이터 | [reports/simulator_report_ko.md](reports/simulator_report_ko.md) |
 | 모델 비교, 테스트 결과, SHAP, 점수 체계 | [reports/model_report_ko.md](reports/model_report_ko.md) |
 | 점검 (경로, 공정성, 안정성, 민감도) | [reports/audit_report_ko.md](reports/audit_report_ko.md) |
+| 공정성 검증과 Bias Mitigation | [reports/fairness_report_ko.md](reports/fairness_report_ko.md) |
+| XAI (SHAP 전역·지역 해석, 거절 사유) | [reports/xai_report_ko.md](reports/xai_report_ko.md) |
 | MLflow 안내 | [reports/mlflow_schema_ko.md](reports/mlflow_schema_ko.md) |
 | ANOVA 인계 | [reports/anova_handoff_ko.md](reports/anova_handoff_ko.md) |
+| ANOVA 통계 검증 결과 | [reports/anova_report_ko.md](reports/anova_report_ko.md) |
 | German Credit 보조 모델 | [reports/german_report_ko.md](reports/german_report_ko.md) |
 | 조치 가능성 표 | `reports/actionability_table_ko.xlsx` (YAML 에서 생성, 직접 수정 금지) |
 
@@ -291,13 +309,13 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 **체민규 (공정성, SHAP, DiCE, 비용 함수, ANOVA)**
 - `configs/actionability.yaml` 과 Excel: DiCE 가 바꿀 수 있는 변수(`dice_vary`), 방향, 단위, 허용 범위, 난이도, 단계당 개월. `spending_consistency` 의 단위, 난이도, 기간은 멘토 검토가 필요한 팀 가정이다.
 - 경로 목표: 점수 495 (`recourse_target_score`), 승인은 475 유지. 495 를 목표로 한 경로는 재학습해도 90.8% 가 승인을 유지한다.
-- **거절 사유:** 권장 불가 변수 (SHAP 1위·2위인 `regular_payment_count`, `app_login_frequency` 와 대출·신용한도 수, 부동산 담보대출 수) 는 조언이 아니라 "참고(변경 불가)" 로만 표시한다. 시간 의존 경로는 기다리는 기간으로 표현한다.
-- **공정성 미결 과제:** 연령대 균등 기회(EO) 격차가 0.121 로 목표 0.10 을 충족하지 못한다 (DI 0.832 와 성별은 통과).
+- **거절 사유:** 권장 불가 변수 (SHAP 1위·2위인 `regular_payment_count`, `app_login_frequency` 와 대출·신용한도 수, 부동산 담보대출 수), 불변 변수 (연령 등), 감소 불가 변수 (과거 연체 횟수) 는 조언이 아니라 "참고(변경 불가)" 로만 표시한다 (`configs/config.yaml` 의 `explainer.reference_only_classes`). 시간 의존 경로는 기다리는 기간으로 표현한다.
+- **공정성 (해결):** 연령대 균등 기회(EO) 격차 0.121 (목표 0.10 미달) 을 가중치 재학습으로 0.025 까지 줄였다 (AUC 0.9492 → 0.9458). 연령대별 기준점 방식은 0.097 로 겨우 통과해 비교로만 남겼다. [reports/fairness_report_ko.md](reports/fairness_report_ko.md) 참고.
 - **경로 미결 과제:** 495 목표의 경로 커버리지가 12개월 87.9% (24개월 91.8%) 로 목표 90% 에 미달한다 (점검 보고서 참고).
 - DiCE 에서 소득과 부채비율을 연결해야 한다 (소득이 오르면 부채비율이 내려감).
-- ANOVA 데이터: `reports/cv_fold_auc.csv` (5 × 5 폴드, 세그먼트 all / thin / general) 와 [reports/anova_handoff_ko.md](reports/anova_handoff_ko.md).
+- ANOVA (완료): 피처 그룹별 (η² 0.98, 통합 > 대안 > 전통) 과 알고리즘별 (통합 피처끼리 비교, 트리 모델이 LR 보다 AUC 0.002 높음) 모두 p < 0.05, Tukey HSD 수행. [reports/anova_report_ko.md](reports/anova_report_ko.md). 데이터: `reports/cv_fold_auc.csv`, [reports/anova_handoff_ko.md](reports/anova_handoff_ko.md).
 - 실제 성별 점검: `reports/german/oof_predictions.csv` ([reports/german_report_ko.md](reports/german_report_ko.md) 참고).
-- **API·대시보드 연결 지점:** 거절 사유 `src/explainer/reasons.py`, ANOVA `src/statistics/anova.py` 는 1차 구현이다 (자유롭게 수정). Bias Mitigation 을 구현하면 `src/api/dummy.py` 의 `mitigated()` 대신 그 결과를 `/fairness/mitigation` 에 연결한다.
+- **API·대시보드 연결 지점:** 거절 사유 `src/explainer/reasons.py`, ANOVA `src/statistics/anova.py` 는 1차 구현이다 (자유롭게 수정). `/fairness` 와 `/fairness/mitigation` 은 `src/fairness` 의 결과 파일을 읽는다 (적용 후로 보여줄 방법은 `configs/config.yaml` 의 `fairness.mitigation.api_method`).
 
 **윤제진 (MLflow, Docker, FastAPI, Streamlit)**
 - [reports/mlflow_schema_ko.md](reports/mlflow_schema_ko.md): 실험 (알고리즘별, final, audit), 지표 키, 입력 열 21개, 모델 불러오는 방법. 모든 모델 아티팩트에 signature 와 input example 이 있으며, 서빙 모델은 확률을 반환한다 (1번 열 = PD).
@@ -309,7 +327,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 
 - **시뮬레이션 편향:** 과제 예시처럼 시뮬레이터가 테스트 세트를 포함한 모든 행에 타깃을 사용한다. GMSC 만 사용한 결과가 현실적인 기준이다.
 - **상관 규칙:** 과제 변수 5개는 관측 r = −0.32 로 보정된다 (체크리스트는 `df.corr()` 로 확인). 그래서 각각이 어떤 실제 신용 변수보다 강하다. r = −0.50 에서는 변수 간 0.60 상한을 지킬 수 없다.
-- **공정성:** 연령대 EO 격차 (0.121) 가 목표 0.10 을 충족하지 못하며, 재학습 시 기준점 근처 결정의 26.8% 가 뒤바뀐다.
+- **공정성:** 배포 모델의 연령대 EO 격차 (0.121) 는 목표 0.10 미달이며, 완화 모델 (가중치 재학습, 0.025) 은 비교용으로만 계산하고 배포하지 않았다. 성별은 시뮬레이션 값이고, EO 격차에는 신뢰구간이 없다. 재학습 시 기준점 근처 결정의 26.8% 가 뒤바뀐다.
 - **PSI** 는 같은 모집단의 무작위 표본을 비교하므로 구조적으로 0 에 가깝고, GMSC 에는 drift 검증용 날짜가 없다.
 - **과제의 씬파일러 규칙** (연체 컬럼 2개 이상 결측 또는 카드 이력 12개월 미만) 은 원본 GMSC 에서 0% 를 판정하므로 대리 기준을 사용한다 (`is_thin_filer_mission` 은 구현되어 있음, 데이터 보고서 참고).
 - 등급 기준, 승인 규칙, 경로 비용은 금융기관 값이 아닌 팀의 가정이다.
@@ -343,13 +361,13 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 - [x] 12. 5-Fold Cross-Validation 및 성능 평가
 - [x] 13. AUC-ROC, KS 통계량 계산 모듈 개발
 - [x] 14. 씬파일러 집단 대안 데이터 효과 분석
-- [x] 15. ANOVA 통계 검증 모듈 개발 (2가지 검증 + Tukey HSD) · 1차 구현 (`src/statistics/anova.py`), 해석 리포트 남음
-- [ ] 16. SHAP TreeExplainer 적용 및 전역 해석 시각화 · TreeExplainer 적용, 전역은 Top 10 표시 중 (Summary Top 15 · Dependence Plot 이미지 남음)
+- [x] 15. ANOVA 통계 검증 모듈 개발 (2가지 검증 + Tukey HSD) · `src/statistics/anova.py`, [리포트](reports/anova_report_ko.md)
+- [x] 16. SHAP TreeExplainer 적용 및 전역 해석 시각화 · `src/explainer/global_shap.py`: Summary Plot (상위 15개), Dependence Plot 4개 (`reports/figures/13_*`, `14_*`). 대시보드는 Top 10 막대
 - [x] 17. SHAP 지역 해석 (Force Plot, Waterfall) 구현 · 대시보드 Waterfall
 - [x] 18. 거절 사유 Top 5 자동 생성 로직 개발
-- [ ] 19. 공정성 지표 계산 모듈 (DI Ratio, Equalized Odds) · API 는 점검 보고서 값을 사용, `src/fairness/` 계산 모듈 남음
-- [ ] 20. Bias Mitigation 구현 (Reweighting, Threshold Adjustment) · API·대시보드는 더미 값으로 연결됨
-- [x] 21. FastAPI 서버 구현 (7개 엔드포인트) · 더미 부분: Mitigation 후 지표, ROC/PR 곡선
+- [x] 19. 공정성 지표 계산 모듈 (DI Ratio, Equalized Odds) · `src/fairness/metrics.py`
+- [x] 20. Bias Mitigation 구현 (Reweighting, Threshold Adjustment) · `src/fairness/mitigation.py`, [리포트](reports/fairness_report_ko.md)
+- [x] 21. FastAPI 서버 구현 (7개 엔드포인트) · 더미 부분: ROC/PR 곡선
 - [x] 22. Pydantic 스키마 정의 및 Swagger UI 설정
 - [x] 23. Streamlit 대시보드 구현 (5개 탭)
 - [x] 24. API ↔ 대시보드 연동 테스트

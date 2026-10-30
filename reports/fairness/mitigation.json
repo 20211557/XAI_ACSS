@@ -1,0 +1,416 @@
+{
+  "attribute": "age_band",
+  "evaluated_on": "test",
+  "rows": 22500,
+  "rule": {
+    "di_band": [
+      0.8,
+      1.25
+    ],
+    "eo_limit": 0.1,
+    "base_cutoff": 475,
+    "threshold_selection": "validation set; EO <= limit, DI in band, default rate among approved not above the single-cutoff rate; most approvals wins"
+  },
+  "before": {
+    "fairness": {
+      "gender": {
+        "groups": {
+          "female": {
+            "n": 11287,
+            "default_rate": 0.0663,
+            "approval_rate": 0.867,
+            "approval_ci95": [
+              0.8608,
+              0.8733
+            ],
+            "tpr_approval_if_repaid": 0.9164,
+            "fpr_approval_if_defaulted": 0.1711
+          },
+          "male": {
+            "n": 11213,
+            "default_rate": 0.0674,
+            "approval_rate": 0.8716,
+            "approval_ci95": [
+              0.8654,
+              0.8778
+            ],
+            "tpr_approval_if_repaid": 0.9195,
+            "fpr_approval_if_defaulted": 0.209
+          }
+        },
+        "di_ratio_min_over_max": 0.9948,
+        "eo_tpr_diff": 0.0031,
+        "eo_fpr_diff": 0.0379,
+        "eo_gap": 0.0379,
+        "di_pass": true,
+        "eo_pass": true,
+        "warnings": []
+      },
+      "age_band": {
+        "groups": {
+          "20-34": {
+            "n": 2970,
+            "default_rate": 0.1178,
+            "approval_rate": 0.7737,
+            "approval_ci95": [
+              0.7587,
+              0.7888
+            ],
+            "tpr_approval_if_repaid": 0.8573,
+            "fpr_approval_if_defaulted": 0.1486
+          },
+          "35-54": {
+            "n": 9753,
+            "default_rate": 0.0837,
+            "approval_rate": 0.8376,
+            "approval_ci95": [
+              0.8303,
+              0.8449
+            ],
+            "tpr_approval_if_repaid": 0.8981,
+            "fpr_approval_if_defaulted": 0.1752
+          },
+          "55+": {
+            "n": 9777,
+            "default_rate": 0.0346,
+            "approval_rate": 0.9299,
+            "approval_ci95": [
+              0.9249,
+              0.935
+            ],
+            "tpr_approval_if_repaid": 0.9536,
+            "fpr_approval_if_defaulted": 0.2692
+          }
+        },
+        "di_ratio_min_over_max": 0.832,
+        "eo_tpr_diff": 0.0963,
+        "eo_fpr_diff": 0.1207,
+        "eo_gap": 0.1207,
+        "di_pass": true,
+        "eo_pass": false,
+        "warnings": [
+          "age_band: Equalized Odds FPR gap 0.121 exceeds 0.1"
+        ]
+      }
+    },
+    "performance": {
+      "n_approved": 19559,
+      "approval_rate": 0.8693,
+      "default_rate_approved": 0.0146,
+      "auc": 0.9492
+    }
+  },
+  "methods": {
+    "threshold_adjustment": {
+      "fairness": {
+        "gender": {
+          "groups": {
+            "female": {
+              "n": 11287,
+              "default_rate": 0.0663,
+              "approval_rate": 0.8669,
+              "approval_ci95": [
+                0.8607,
+                0.8732
+              ],
+              "tpr_approval_if_repaid": 0.9163,
+              "fpr_approval_if_defaulted": 0.1711
+            },
+            "male": {
+              "n": 11213,
+              "default_rate": 0.0674,
+              "approval_rate": 0.8727,
+              "approval_ci95": [
+                0.8666,
+                0.8789
+              ],
+              "tpr_approval_if_repaid": 0.9205,
+              "fpr_approval_if_defaulted": 0.2116
+            }
+          },
+          "di_ratio_min_over_max": 0.9933,
+          "eo_tpr_diff": 0.0042,
+          "eo_fpr_diff": 0.0405,
+          "eo_gap": 0.0405,
+          "di_pass": true,
+          "eo_pass": true,
+          "warnings": []
+        },
+        "age_band": {
+          "groups": {
+            "20-34": {
+              "n": 2970,
+              "default_rate": 0.1178,
+              "approval_rate": 0.7737,
+              "approval_ci95": [
+                0.7587,
+                0.7888
+              ],
+              "tpr_approval_if_repaid": 0.8573,
+              "fpr_approval_if_defaulted": 0.1486
+            },
+            "35-54": {
+              "n": 9753,
+              "default_rate": 0.0837,
+              "approval_rate": 0.848,
+              "approval_ci95": [
+                0.8409,
+                0.8552
+              ],
+              "tpr_approval_if_repaid": 0.9084,
+              "fpr_approval_if_defaulted": 0.1875
+            },
+            "55+": {
+              "n": 9777,
+              "default_rate": 0.0346,
+              "approval_rate": 0.9207,
+              "approval_ci95": [
+                0.9154,
+                0.9261
+              ],
+              "tpr_approval_if_repaid": 0.9449,
+              "fpr_approval_if_defaulted": 0.2456
+            }
+          },
+          "di_ratio_min_over_max": 0.8403,
+          "eo_tpr_diff": 0.0877,
+          "eo_fpr_diff": 0.097,
+          "eo_gap": 0.097,
+          "di_pass": true,
+          "eo_pass": true,
+          "warnings": []
+        }
+      },
+      "performance": {
+        "n_approved": 19571,
+        "approval_rate": 0.8698,
+        "default_rate_approved": 0.0147,
+        "auc": 0.9492
+      },
+      "search": {
+        "cutoffs": {
+          "20-34": 475.0,
+          "35-54": 465.0,
+          "55+": 490.0
+        },
+        "base_cutoff": 475.0,
+        "combinations_checked": 29791,
+        "combinations_feasible": 2065,
+        "base_default_rate_approved": 0.0129,
+        "validation": {
+          "before": {
+            "fairness": {
+              "age_band": {
+                "groups": {
+                  "20-34": {
+                    "n": 2901,
+                    "default_rate": 0.1058,
+                    "approval_rate": 0.778,
+                    "approval_ci95": [
+                      0.7629,
+                      0.7931
+                    ],
+                    "tpr_approval_if_repaid": 0.8547,
+                    "fpr_approval_if_defaulted": 0.1303
+                  },
+                  "35-54": {
+                    "n": 9810,
+                    "default_rate": 0.0819,
+                    "approval_rate": 0.8315,
+                    "approval_ci95": [
+                      0.8241,
+                      0.8389
+                    ],
+                    "tpr_approval_if_repaid": 0.8921,
+                    "fpr_approval_if_defaulted": 0.1519
+                  },
+                  "55+": {
+                    "n": 9789,
+                    "default_rate": 0.0402,
+                    "approval_rate": 0.9264,
+                    "approval_ci95": [
+                      0.9213,
+                      0.9316
+                    ],
+                    "tpr_approval_if_repaid": 0.9557,
+                    "fpr_approval_if_defaulted": 0.2284
+                  }
+                },
+                "di_ratio_min_over_max": 0.8398,
+                "eo_tpr_diff": 0.1011,
+                "eo_fpr_diff": 0.0981,
+                "eo_gap": 0.1011,
+                "di_pass": true,
+                "eo_pass": false,
+                "warnings": [
+                  "age_band: Equalized Odds TPR gap 0.101 exceeds 0.1"
+                ]
+              }
+            },
+            "performance": {
+              "n_approved": 19483,
+              "approval_rate": 0.8659,
+              "default_rate_approved": 0.0129
+            }
+          },
+          "after": {
+            "fairness": {
+              "age_band": {
+                "groups": {
+                  "20-34": {
+                    "n": 2901,
+                    "default_rate": 0.1058,
+                    "approval_rate": 0.778,
+                    "approval_ci95": [
+                      0.7629,
+                      0.7931
+                    ],
+                    "tpr_approval_if_repaid": 0.8547,
+                    "fpr_approval_if_defaulted": 0.1303
+                  },
+                  "35-54": {
+                    "n": 9810,
+                    "default_rate": 0.0819,
+                    "approval_rate": 0.8438,
+                    "approval_ci95": [
+                      0.8366,
+                      0.851
+                    ],
+                    "tpr_approval_if_repaid": 0.9041,
+                    "fpr_approval_if_defaulted": 0.1681
+                  },
+                  "55+": {
+                    "n": 9789,
+                    "default_rate": 0.0402,
+                    "approval_rate": 0.9163,
+                    "approval_ci95": [
+                      0.9108,
+                      0.9218
+                    ],
+                    "tpr_approval_if_repaid": 0.9468,
+                    "fpr_approval_if_defaulted": 0.1904
+                  }
+                },
+                "di_ratio_min_over_max": 0.849,
+                "eo_tpr_diff": 0.0921,
+                "eo_fpr_diff": 0.0601,
+                "eo_gap": 0.0921,
+                "di_pass": true,
+                "eo_pass": true,
+                "warnings": []
+              }
+            },
+            "performance": {
+              "n_approved": 19505,
+              "approval_rate": 0.8669,
+              "default_rate_approved": 0.0128
+            }
+          }
+        }
+      },
+      "decisions_changed": 192
+    },
+    "reweighting": {
+      "fairness": {
+        "gender": {
+          "groups": {
+            "female": {
+              "n": 11287,
+              "default_rate": 0.0663,
+              "approval_rate": 0.8652,
+              "approval_ci95": [
+                0.8589,
+                0.8715
+              ],
+              "tpr_approval_if_repaid": 0.9145,
+              "fpr_approval_if_defaulted": 0.1698
+            },
+            "male": {
+              "n": 11213,
+              "default_rate": 0.0674,
+              "approval_rate": 0.8724,
+              "approval_ci95": [
+                0.8662,
+                0.8786
+              ],
+              "tpr_approval_if_repaid": 0.9197,
+              "fpr_approval_if_defaulted": 0.2183
+            }
+          },
+          "di_ratio_min_over_max": 0.9917,
+          "eo_tpr_diff": 0.0052,
+          "eo_fpr_diff": 0.0485,
+          "eo_gap": 0.0485,
+          "di_pass": true,
+          "eo_pass": true,
+          "warnings": []
+        },
+        "age_band": {
+          "groups": {
+            "20-34": {
+              "n": 2970,
+              "default_rate": 0.1178,
+              "approval_rate": 0.8199,
+              "approval_ci95": [
+                0.806,
+                0.8337
+              ],
+              "tpr_approval_if_repaid": 0.9038,
+              "fpr_approval_if_defaulted": 0.1914
+            },
+            "35-54": {
+              "n": 9753,
+              "default_rate": 0.0837,
+              "approval_rate": 0.853,
+              "approval_ci95": [
+                0.8459,
+                0.86
+              ],
+              "tpr_approval_if_repaid": 0.9124,
+              "fpr_approval_if_defaulted": 0.2022
+            },
+            "55+": {
+              "n": 9777,
+              "default_rate": 0.0346,
+              "approval_rate": 0.8994,
+              "approval_ci95": [
+                0.8934,
+                0.9053
+              ],
+              "tpr_approval_if_repaid": 0.9252,
+              "fpr_approval_if_defaulted": 0.1775
+            }
+          },
+          "di_ratio_min_over_max": 0.9116,
+          "eo_tpr_diff": 0.0214,
+          "eo_fpr_diff": 0.0247,
+          "eo_gap": 0.0247,
+          "di_pass": true,
+          "eo_pass": true,
+          "warnings": []
+        }
+      },
+      "performance": {
+        "n_approved": 19547,
+        "approval_rate": 0.8688,
+        "default_rate_approved": 0.0149,
+        "auc": 0.9458
+      },
+      "weights": {
+        "20-34": {
+          "repaid": 1.0492,
+          "defaulted": 0.6041
+        },
+        "35-54": {
+          "repaid": 1.0177,
+          "defaulted": 0.8044
+        },
+        "55+": {
+          "repaid": 0.9698,
+          "defaulted": 1.7685
+        }
+      },
+      "decisions_changed": 598
+    }
+  }
+}

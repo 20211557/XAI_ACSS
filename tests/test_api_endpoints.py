@@ -93,14 +93,16 @@ def test_explain_shap_values_add_up_to_predicted_log_odds(model_ready):
     assert len(body["shap_values"]) == 21
 
 
-def test_fairness_returns_di_and_equalized_odds_from_audit():
+def test_fairness_returns_di_and_equalized_odds_from_fairness_module():
     body = client.get("/fairness", params={"attribute": "age_band"}).json()
-    audit = json.loads(
-        (PROJECT_ROOT / "reports" / "audit" / "2_fairness.json").read_text(encoding="utf-8")
+    metrics = json.loads(
+        (PROJECT_ROOT / "reports" / "fairness" / "fairness_metrics.json").read_text(
+            encoding="utf-8"
+        )
     )
 
     assert {"di_ratio", "equalized_odds_tpr_diff", "equalized_odds_fpr_diff"} <= set(body)
-    assert body["di_ratio"] == audit["age_band"]["di_ratio_min_over_max"]
+    assert body["di_ratio"] == metrics["age_band"]["di_ratio_min_over_max"]
     assert set(body["attributes"]) == {"gender", "age_band"}
     assert body["is_dummy"] is False
 
@@ -112,12 +114,15 @@ def test_fairness_warns_when_thresholds_are_violated():
     assert client.get("/fairness", params={"attribute": "unknown"}).status_code == 422
 
 
-def test_mitigation_compares_real_before_with_dummy_after():
+def test_mitigation_compares_real_before_and_after():
     body = client.get("/fairness/mitigation").json()
 
-    assert body["before_is_dummy"] is False and body["after_is_dummy"] is True
+    assert body["before_is_dummy"] is False and body["after_is_dummy"] is False
+    assert body["method"] == load_config()["fairness"]["mitigation"]["api_method"]
     assert set(body["before"]) == set(body["after"]) == {"gender", "age_band"}
-    assert body["after"]["age_band"]["di_ratio"] >= body["before"]["age_band"]["di_ratio"]
+    # the age-band Equalized Odds gap fails before mitigation and passes after
+    assert body["before"]["age_band"]["eo_pass"] is False
+    assert body["after"]["age_band"]["eo_pass"] is True
 
 
 def test_model_version_is_consistent_across_endpoints():

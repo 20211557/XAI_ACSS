@@ -5,8 +5,8 @@
 대시보드용 추가: /features (입력 폼 정보), /explain/global (전역 SHAP)
 
 실제 값: 배포 모델(/predict, /explain),
-        reports/ 산출물(/metrics, /fairness, /anova, /explain/global).
-더미 값: Mitigation 적용 후 지표, ROC/PR 곡선 좌표 → 응답에 is_dummy 로 표시 (src/api/dummy.py).
+        reports/ 산출물(/metrics, /fairness, /fairness/mitigation, /anova, /explain/global).
+더미 값: ROC/PR 곡선 좌표 → 응답에 is_dummy 로 표시 (src/api/dummy.py).
 """
 
 from __future__ import annotations
@@ -39,9 +39,14 @@ config = load_config()
 logger = get_logger(__name__)
 
 FAIRNESS_NOTE = (
-    "배포 모델의 test 세트 점검 결과 (notebooks/audit.py). 성별은 타깃과 독립인 시뮬레이션 값이며, "
-    "TPR/FPR 의 양성은 '승인'이다 (TPR = 상환자 중 승인 비율, FPR = 부도자 중 승인 비율)."
+    "배포 모델의 test 세트 공정성 검증 결과 (python -m src.fairness). 성별은 타깃과 독립인 "
+    "시뮬레이션 값이며, TPR/FPR 의 양성은 '승인'이다 "
+    "(TPR = 상환자 중 승인 비율, FPR = 부도자 중 승인 비율)."
 )
+MITIGATION_LABELS = {
+    "reweighting": "가중치 재학습 (Reweighting)",
+    "threshold_adjustment": "연령대별 승인 기준점 (Threshold Adjustment)",
+}
 
 
 def _model():
@@ -243,8 +248,8 @@ def fairness(
     ),
 ) -> FairnessResponse:
     cfg = config["fairness"]
-    audit = reports.read_json("fairness_audit")
-    summaries = {a: reports.fairness_summary(a, audit, cfg) for a in ("gender", "age_band")}
+    metrics = reports.read_json("fairness_metrics")
+    summaries = {a: reports.fairness_summary(a, metrics, cfg) for a in ("gender", "age_band")}
     chosen = summaries[attribute or cfg["default_attribute"]]
     return FairnessResponse(
         **chosen,
@@ -253,7 +258,7 @@ def fairness(
             "di_ratio_bounds": cfg["di_ratio_bounds"],
             "equalized_odds_max_diff": cfg["equalized_odds_max_diff"],
         },
-        source=reports.source_of("fairness_audit"),
+        source=reports.source_of("fairness_metrics"),
         is_dummy=False,
         note=FAIRNESS_NOTE,
     )
@@ -266,19 +271,27 @@ def fairness(
     summary="Bias Mitigation 적용 전/후 공정성 지표 비교",
 )
 def fairness_mitigation() -> MitigationResponse:
-    audit = reports.read_json("fairness_audit")
-    before = {
-        a: reports.fairness_summary(a, audit, config["fairness"]) for a in ("gender", "age_band")
-    }
+    cfg = config["fairness"]
+    method = cfg["mitigation"]["api_method"]
+    result = reports.read_json("fairness_mitigation")
+    attributes = ("gender", "age_band")
+    before = {a: reports.fairness_summary(a, result["before"]["fairness"], cfg) for a in attributes}
+    chosen = result["methods"][method]
+    after = {a: reports.fairness_summary(a, chosen["fairness"], cfg) for a in attributes}
+    p0, p1 = result["before"]["performance"], chosen["performance"]
     return MitigationResponse(
-        method="threshold_adjustment",
+        method=method,
         before=before,
-        after={a: dummy.mitigated(s, config["fairness"]) for a, s in before.items()},
+        after=after,
         before_is_dummy=False,
-        after_is_dummy=True,
-        source=reports.source_of("fairness_audit"),
-        note="before 는 실제 점검 결과, after 는 완화 기법(src/fairness) 구현 전까지 쓰는 "
-        "예시 값이다 (집단별 승인율·TPR·FPR 을 평균 쪽으로 절반 당긴 값).",
+        after_is_dummy=False,
+        source=reports.source_of("fairness_mitigation"),
+        note=(
+            f"test 세트, 완화 대상 {result['attribute']}. 적용 후 = {MITIGATION_LABELS[method]}. "
+            f"AUC {p0['auc']:.4f} → {p1['auc']:.4f}, 승인율 {p0['approval_rate']:.2%} → "
+            f"{p1['approval_rate']:.2%}, 승인자 부도율 {p0['default_rate_approved']:.2%} → "
+            f"{p1['default_rate_approved']:.2%}. 다른 방법의 결과도 같은 파일에 있다."
+        ),
     )
 
 
@@ -342,6 +355,7 @@ def anova() -> AnovaResponse:
         **results,
         source=reports.source_of("cv_fold_auc"),
         is_dummy=False,
-        note="train 분할 안의 5 × 5 폴드 AUC (segment = all). 폴드들이 학습 데이터를 공유해 "
-        "독립 표본이 아니므로 p-value 는 근사값이다 (reports/anova_handoff_ko.md).",
+        note="train 분할 안의 5 × 5 폴드 AUC (segment = all). 검증 2 는 통합 피처끼리 비교한다. "
+        "폴드들이 학습 데이터를 공유해 독립 표본이 아니므로 p-value 는 근사값이다 "
+        "(reports/anova_report_ko.md).",
     )

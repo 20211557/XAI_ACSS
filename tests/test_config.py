@@ -52,6 +52,6 @@ def test_fairness_thresholds_match_spec():
 
 
 def test_fairness_age_groups_match_simulator_bands():
-    age_groups = load_config()["fairness"]["protected_attributes"]["age_group"]
+    age_groups = load_config()["fairness"]["protected_attributes"]["age_band"]
 
     assert age_groups == _yaml("simulator.yaml")["age_bands"]["labels"]

@@ -392,7 +392,12 @@ def tab_fairness() -> None:
     ):
         fig = go.Figure()
         for (side, label), color in zip(
-            (("before", "적용 전 (실제)"), ("after", "적용 후 (더미)")), SERIES, strict=True
+            (
+                ("before", "적용 전"),
+                ("after", "적용 후 (더미)" if mit["after_is_dummy"] else "적용 후"),
+            ),
+            SERIES,
+            strict=True,
         ):
             fig.add_bar(
                 name=label, x=names, y=[metric(mit[side][a]) for a in mit[side]], marker_color=color

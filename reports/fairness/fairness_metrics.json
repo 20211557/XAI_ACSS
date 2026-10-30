@@ -1,0 +1,95 @@
+{
+  "gender": {
+    "groups": {
+      "female": {
+        "n": 11287,
+        "default_rate": 0.0663,
+        "approval_rate": 0.867,
+        "approval_ci95": [
+          0.8608,
+          0.8733
+        ],
+        "tpr_approval_if_repaid": 0.9164,
+        "fpr_approval_if_defaulted": 0.1711
+      },
+      "male": {
+        "n": 11213,
+        "default_rate": 0.0674,
+        "approval_rate": 0.8716,
+        "approval_ci95": [
+          0.8654,
+          0.8778
+        ],
+        "tpr_approval_if_repaid": 0.9195,
+        "fpr_approval_if_defaulted": 0.209
+      }
+    },
+    "di_ratio_min_over_max": 0.9948,
+    "eo_tpr_diff": 0.0031,
+    "eo_fpr_diff": 0.0379,
+    "eo_gap": 0.0379,
+    "di_pass": true,
+    "eo_pass": true,
+    "warnings": []
+  },
+  "age_band": {
+    "groups": {
+      "20-34": {
+        "n": 2970,
+        "default_rate": 0.1178,
+        "approval_rate": 0.7737,
+        "approval_ci95": [
+          0.7587,
+          0.7888
+        ],
+        "tpr_approval_if_repaid": 0.8573,
+        "fpr_approval_if_defaulted": 0.1486
+      },
+      "35-54": {
+        "n": 9753,
+        "default_rate": 0.0837,
+        "approval_rate": 0.8376,
+        "approval_ci95": [
+          0.8303,
+          0.8449
+        ],
+        "tpr_approval_if_repaid": 0.8981,
+        "fpr_approval_if_defaulted": 0.1752
+      },
+      "55+": {
+        "n": 9777,
+        "default_rate": 0.0346,
+        "approval_rate": 0.9299,
+        "approval_ci95": [
+          0.9249,
+          0.935
+        ],
+        "tpr_approval_if_repaid": 0.9536,
+        "fpr_approval_if_defaulted": 0.2692
+      }
+    },
+    "di_ratio_min_over_max": 0.832,
+    "eo_tpr_diff": 0.0963,
+    "eo_fpr_diff": 0.1207,
+    "eo_gap": 0.1207,
+    "di_pass": true,
+    "eo_pass": false,
+    "warnings": [
+      "age_band: Equalized Odds FPR gap 0.121 exceeds 0.1"
+    ]
+  },
+  "rule": {
+    "di_band": [
+      0.8,
+      1.25
+    ],
+    "eo_limit": 0.1,
+    "positive_for_tpr_fpr": "approved; TPR = approval rate among repaid, FPR = among defaulted"
+  },
+  "source": {
+    "model_file": "models/xgboost_v1.0.joblib",
+    "split": "test",
+    "rows": 22500,
+    "approval_rate": 0.8693
+  }
+}

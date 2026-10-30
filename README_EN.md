@@ -99,6 +99,21 @@ docker compose --profile dev run --rm dev python -m src.data.actionability_table
 docker compose --profile dev run --rm dev python -m src.models.german
 ```
 
+Fairness check and bias mitigation (scores the test set with the shipped model, no training; writes `reports/fairness/*.json`, which the API reads)
+
+```bash
+docker compose --profile dev run --rm dev python -m src.fairness              # a few seconds
+docker compose --profile dev run --rm dev python -m src.fairness.mitigation   # about 1 to 2 minutes (includes reweighted retraining)
+```
+
+Global SHAP figures (Summary Plot of the top 15, dependence plots → `reports/figures/13_*`, `14_*`, Korean and English). The dev
+container has no Korean font, so pass a font file from the host (for example NanumGothic on Windows; on macOS AppleGothic is found if installed).
+
+```bash
+docker compose --profile dev run --rm -v C:/Windows/Fonts/NanumGothic.ttf:/fonts/ko.ttf:ro \
+  -e KO_FONT_PATH=/fonts/ko.ttf dev python -m src.explainer.global_shap   # about 10 seconds
+```
+
 ### 3. Development environment (dev container)
 
 A container with Python 3.12 and every library, with the whole repo mounted at `/app`.
@@ -172,8 +187,8 @@ are placeholders; the dashboard marks them 🟡 **dummy data** (`src/api/dummy.p
 | `/health` | GET | Status, model version | Real |
 | `/predict` | POST | Credit score (0 to 1000), approval, default probability, risk grade (A to E), thin-filer flag | Real (shipped model) |
 | `/explain` | POST | Top 5 rejection reasons (feature, current_value, shap_contribution, explanation), SHAP per feature | Real (shipped model + SHAP) |
-| `/fairness` | GET | DI ratio and equalized odds (TPR/FPR gaps) by gender and age band, approval rate per group | Real (`reports/audit/2_fairness.json`) |
-| `/fairness/mitigation` | GET | Before/after mitigation | Before: real, **after: dummy** (until `src/fairness` exists) |
+| `/fairness` | GET | DI ratio and equalized odds (TPR/FPR gaps) by gender and age band, approval rate per group | Real (`reports/fairness/fairness_metrics.json`) |
+| `/fairness/mitigation` | GET | Before/after mitigation (after = reweighting; performance change in `note`) | Real (`reports/fairness/mitigation.json`) |
 | `/metrics` | GET | AUC, KS, precision, recall, F1, confusion matrix, grade table | Real (`reports/final_summary.json`); **ROC/PR curve points: dummy** |
 | `/anova` | GET | Two one-way ANOVAs (F, p, eta squared), Tukey HSD | Real (`reports/cv_fold_auc.csv`) |
 | `/explain/global` | GET | Global SHAP importance (for the dashboard) | Real (top 10, `reports/shap_global_top10.csv`) |
@@ -223,7 +238,7 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 
 | File | Controls |
 | --- | --- |
-| `configs/config.yaml` | Mission performance targets, disclaimer, XAI (top 15, 5 rejection reasons), fairness (protected attributes, DI 0.8 to 1.25, EO 0.10), statistics (alpha, eta squared bands) |
+| `configs/config.yaml` | Mission performance targets, disclaimer, XAI (top 15, 5 rejection reasons), fairness (protected attributes, DI 0.8 to 1.25, EO 0.10, mitigation target, cutoff candidates, method shown by the API), statistics (alpha, eta squared bands) |
 | `configs/data.yaml` | Cleaning rules (special codes, utilization threshold, minimum age) |
 | `configs/simulator.yaml` | The 8 alternative variables (distributions, observed / latent correlation targets, shared factor), credit link, `thin_filer_ratio` / `thin_filer_mode` / `bias_ratio`, thin-filer rules, age bands |
 | `configs/actionability.yaml` | Per-variable actionability class, direction, step, bounds, monotone sign, `dice_vary`, `model_feature`, notes (Korean and English) |
@@ -248,7 +263,7 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 │   ├── utils/               # Shared utilities such as the logger
 │   ├── data/                # loader, preprocessor, simulator, features (thin-filer rule), actionability_table
 │   ├── models/              # train, evaluate, scoring, german, registry (Model Registry), predictor (serving)
-│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (rejection reason sentences)
+│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (rejection reason sentences), global_shap (global figures)
 │   ├── fairness/            # DI ratio, equalized odds, bias mitigation
 │   ├── statistics/          # anova.py (one-way ANOVA, eta squared, Tukey HSD)
 │   ├── api/                 # FastAPI (main.py, schemas.py, reports.py, dummy.py)
@@ -275,8 +290,11 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 | Alternative-data simulator | [reports/simulator_report_en.md](reports/simulator_report_en.md) |
 | Model comparison, test results, SHAP, scoring | [reports/model_report_en.md](reports/model_report_en.md) |
 | Audit (recourse, fairness, stability, sensitivity) | [reports/audit_report_en.md](reports/audit_report_en.md) |
+| Fairness check and bias mitigation | [reports/fairness_report_en.md](reports/fairness_report_en.md) |
+| XAI (global and local SHAP, rejection reasons) | [reports/xai_report_en.md](reports/xai_report_en.md) |
 | MLflow guide | [reports/mlflow_schema_en.md](reports/mlflow_schema_en.md) |
 | ANOVA handoff | [reports/anova_handoff_en.md](reports/anova_handoff_en.md) |
+| ANOVA results | [reports/anova_report_en.md](reports/anova_report_en.md) |
 | German Credit secondary model | [reports/german_report_en.md](reports/german_report_en.md) |
 | Actionability table | `reports/actionability_table_en.xlsx` (generated from the YAML; never edit by hand) |
 
@@ -289,13 +307,13 @@ Every report also has a Korean version (`_ko`). The final experiment report (PDF
 **체민규 (fairness, SHAP, DiCE, cost function, ANOVA)**
 - `configs/actionability.yaml` and the Excel files: which variables DiCE may vary (`dice_vary`), direction, step, bounds, difficulty, months per step. `spending_consistency`'s step, difficulty and duration are team assumptions that need mentor review.
 - Recourse target: score 495 (`recourse_target_score`); approval stays at 475. Paths aimed at 495 stay approved 90.8% of the time under retraining.
-- **Rejection reasons:** the NOT_RECOMMENDED variables (`regular_payment_count`, `app_login_frequency`, which are SHAP #1 and #2, plus open credit lines and real estate loans) appear only under "reference (not changeable)", never as advice. TIME_ONLY paths are phrased as waiting time.
-- **Open fairness item:** the age-band equalized-odds gap is 0.121, which fails the 0.10 target (DI 0.832 passes; gender passes).
+- **Rejection reasons:** the NOT_RECOMMENDED variables (`regular_payment_count`, `app_login_frequency`, which are SHAP #1 and #2, plus open credit lines and real estate loans), IMMUTABLE variables (age and others) and NON_DECREASING variables (past late payments) appear only under "reference (not changeable)", never as advice (`explainer.reference_only_classes` in `configs/config.yaml`). TIME_ONLY paths are phrased as waiting time.
+- **Fairness (resolved):** reweighting cut the age-band equalized-odds gap from 0.121 (fails the 0.10 target) to 0.025 (AUC 0.9492 to 0.9458). Cutoffs per age band only just passed at 0.097 and are kept as a comparison. See [reports/fairness_report_en.md](reports/fairness_report_en.md).
 - **Open recourse item:** path coverage at the 495 target is 87.9% over 12 months (91.8% over 24 months), below the 90% goal (see the audit report).
 - DiCE should link income and debt ratio (raising income lowers the ratio).
-- ANOVA data: `reports/cv_fold_auc.csv` (5 × 5 folds, segments all / thin / general) and [reports/anova_handoff_en.md](reports/anova_handoff_en.md).
+- ANOVA (done): by feature group (eta squared 0.98, combined > alternative > traditional) and by algorithm (compared within combined features; tree models beat LR by 0.002 AUC), both p < 0.05 with Tukey HSD. See [reports/anova_report_en.md](reports/anova_report_en.md). Data: `reports/cv_fold_auc.csv`, [reports/anova_handoff_en.md](reports/anova_handoff_en.md).
 - Real-gender check: `reports/german/oof_predictions.csv` (see [reports/german_report_en.md](reports/german_report_en.md)).
-- **Where the API and dashboard plug in:** rejection reasons (`src/explainer/reasons.py`) and ANOVA (`src/statistics/anova.py`) are first versions; change them freely. Once bias mitigation exists, wire its result into `/fairness/mitigation` in place of `mitigated()` in `src/api/dummy.py`.
+- **Where the API and dashboard plug in:** rejection reasons (`src/explainer/reasons.py`) and ANOVA (`src/statistics/anova.py`) are first versions; change them freely. `/fairness` and `/fairness/mitigation` read the output files of `src/fairness` (the method shown as "after" is `fairness.mitigation.api_method` in `configs/config.yaml`).
 
 **윤제진 (MLflow, Docker, FastAPI, Streamlit)**
 - [reports/mlflow_schema_en.md](reports/mlflow_schema_en.md): experiments (one per algorithm, plus final and audit), metric keys, the 21 input columns, how to load the model. Every model artifact has a signature and input example; the served model returns probabilities (column 1 = PD).
@@ -307,7 +325,7 @@ Every report also has a Korean version (`_ko`). The final experiment report (PDF
 
 - **Simulation bias:** the simulator uses the target for all rows, test included, as in the mission's example. The GMSC-only results are the realistic reference.
 - **Correlation rule:** the 5 mission variables are calibrated to observed r = −0.32 (the checklist verifies `df.corr()`), which makes each of them stronger than any real credit feature. At r = −0.50 the 0.60 cap between variables cannot be met.
-- **Fairness:** the age-band EO gap (0.121) fails the 0.10 target; decisions near the cutoff flip in 26.8% of cases when retrained.
+- **Fairness:** the shipped model's age-band EO gap (0.121) fails the 0.10 target; the mitigated model (reweighting, 0.025) is computed for comparison only and is not deployed. Gender is simulated, and the EO gaps carry no confidence intervals. Decisions near the cutoff flip in 26.8% of cases when retrained.
 - **PSI** compares random samples of the same population, so it is close to 0 by construction; GMSC has no dates for a drift test.
 - **The mission's thin-filer rule** (2+ missing past-due columns or card history < 12 months) flags 0% of raw GMSC, so a proxy is used (`is_thin_filer_mission` is implemented; see the data report).
 - Grade cutoffs, approval rule and recourse costs are team assumptions, not values from a lender.
