@@ -1,0 +1,23 @@
+{
+  "RevolvingUtilizationOfUnsecuredLines": 1,
+  "age": 0,
+  "NumberOfTime30-59DaysPastDueNotWorse": 1,
+  "DebtRatio": 1,
+  "MonthlyIncome": -1,
+  "NumberOfOpenCreditLinesAndLoans": 0,
+  "NumberOfTimes90DaysLate": 1,
+  "NumberRealEstateLoansOrLines": 0,
+  "NumberOfTime60-89DaysPastDueNotWorse": 1,
+  "NumberOfDependents": 0,
+  "pastdue_special_code": 0,
+  "income_missing": 0,
+  "income_zero": 0,
+  "util_outlier": 0,
+  "telecom_payment_rate": -1,
+  "utility_payment_rate": -1,
+  "telecom_tenure_months": -1,
+  "insurance_paid_months": -1,
+  "spending_consistency": -1,
+  "regular_payment_count": -1,
+  "app_login_frequency": -1
+}

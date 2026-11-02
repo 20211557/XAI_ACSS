@@ -1,0 +1,25 @@
+{
+  "features": [
+    "RevolvingUtilizationOfUnsecuredLines",
+    "age",
+    "NumberOfTime30-59DaysPastDueNotWorse",
+    "DebtRatio",
+    "MonthlyIncome",
+    "NumberOfOpenCreditLinesAndLoans",
+    "NumberOfTimes90DaysLate",
+    "NumberRealEstateLoansOrLines",
+    "NumberOfTime60-89DaysPastDueNotWorse",
+    "NumberOfDependents",
+    "pastdue_special_code",
+    "income_missing",
+    "income_zero",
+    "util_outlier",
+    "telecom_payment_rate",
+    "utility_payment_rate",
+    "telecom_tenure_months",
+    "insurance_paid_months",
+    "spending_consistency",
+    "regular_payment_count",
+    "app_login_frequency"
+  ]
+}

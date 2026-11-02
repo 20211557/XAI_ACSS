@@ -9,7 +9,7 @@
   - 체민규 (fairness, SHAP, DiCE recourse, cost function, ANOVA): needs `configs/actionability.yaml` + trained model.
   - 윤제진 (MLflow registry, Docker Compose, FastAPI, Streamlit).
 - Environment: Python 3.12 (Docker images and local). Pinned versions in requirements.txt match the shipped model (scikit-learn 1.9.1, xgboost 3.4.1, MLflow 3.16); retrain if you change them.
-- The shipped model was retrained in the Linux dev container on 2026-10-20 (same test metrics as Wonbin's original macOS model). Its runs and the registered model `xai-credit-scoring@production` live on the local compose MLflow server (`mlflow_data/`, not committed). Native Windows XGBoost could not read the macOS model's stored `rng_state` ("input stream corrupted"); the current model is untested on native Windows. On Windows, train and test in the dev container and never commit a Windows-trained model.
+- The shipped model was retrained in the Linux dev container on 2026-10-20 (same test metrics as Wonbin's original macOS model). Its runs and the registered model `xai-credit-scoring@production` live on the compose MLflow server (`mlflow_data/`, not committed); a snapshot is committed as `mlflow_seed/` and copied into an empty `mlflow_data/` on first start. Refresh the snapshot after retraining (`tests/test_mlflow_seed.py` checks it against `reports/final_summary.json`). Native Windows XGBoost could not read the macOS model's stored `rng_state` ("input stream corrupted"); the current model is untested on native Windows. On Windows, train and test in the dev container and never commit a Windows-trained model.
 
 ## Data (place in `data/raw/`, never commit)
 - GMSC: `cs-training.csv` (Kaggle "Give Me Some Credit"). Target: `SeriousDlqin2yrs`.

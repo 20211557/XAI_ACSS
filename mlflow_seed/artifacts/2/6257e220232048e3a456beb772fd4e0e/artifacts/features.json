@@ -1,0 +1,11 @@
+{
+  "features": [
+    "telecom_payment_rate",
+    "utility_payment_rate",
+    "telecom_tenure_months",
+    "insurance_paid_months",
+    "spending_consistency",
+    "regular_payment_count",
+    "app_login_frequency"
+  ]
+}
