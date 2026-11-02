@@ -195,8 +195,8 @@ def explain_global() -> GlobalShapResponse:
         features=rows,
         source=reports.source_of("shap_global"),
         is_dummy=False,
-        note=f"모델 보고서의 test 세트 평균 |SHAP| 상위 {len(rows)}개 "
-        "(과제 기준 Top 15 는 src/explainer 구현 후 제공)",
+        note=f"모델 보고서의 test 세트 평균 |SHAP| 상위 {len(rows)}개. 과제 기준 Summary Plot "
+        "(상위 15개)은 reports/figures/13_shap_summary_ko.png (src/explainer/global_shap.py)",
     )
 
 
