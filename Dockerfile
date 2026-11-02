@@ -39,8 +39,22 @@ RUN pip install "$(grep -E '^mlflow==' /tmp/requirements.txt)" \
  && mkdir -p /mlflow \
  && chown app:app /mlflow
 
+# First start only: if the store (/mlflow = ./mlflow_data) has no database yet, copy the committed
+# snapshot (./mlflow_seed, mounted read-only at /seed by docker-compose.yml). A fresh clone then shows
+# the training runs and the registered model without retraining. An existing store is never touched.
+COPY --chmod=755 <<'EOF' /usr/local/bin/mlflow-seed-entrypoint
+#!/bin/sh
+set -e
+if [ ! -f /mlflow/mlflow.db ] && [ -f /seed/mlflow.db ]; then
+    echo "mlflow-seed: empty store, copying the snapshot from /seed"
+    cp -R /seed/. /mlflow/
+fi
+exec "$@"
+EOF
+
 USER app
 EXPOSE 5000
+ENTRYPOINT ["/usr/local/bin/mlflow-seed-entrypoint"]
 # MLflow 3 는 Host 헤더를 검사한다 (기본: localhost·사설 IP 만 허용).
 # 다른 컨테이너가 http://mlflow:5000 으로 접속하므로 서비스 이름을 허용 목록에 넣는다.
 CMD ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", \

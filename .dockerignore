@@ -21,6 +21,7 @@ htmlcov
 data
 models
 mlflow_data
+mlflow_seed
 mlruns
 mlartifacts
 reports

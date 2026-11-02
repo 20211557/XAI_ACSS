@@ -51,6 +51,7 @@ The dashboard image does not even install the ML libraries.
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose v2.22 or later)
 - Data: follow [data/README.md](data/README.md) to put `data/raw/cs-training.csv` (required) and `data/raw/german.data` (secondary model) in place.
   The trained model `models/xgboost_v1.0.joblib` and the `reports/` folder are committed, so the services start without the data.
+  The MLflow runs and the registered model are committed too, as a snapshot (`mlflow_seed/`, see step 1).
 
 ### 1. Start all services
 
@@ -69,6 +70,10 @@ docker compose up --build   # same as docker-compose up
 
 Stop: `docker compose down`
 
+**MLflow snapshot:** `mlflow_data/` is not committed. On first start, if `mlflow_data/` is empty, the mlflow service copies
+the committed snapshot `mlflow_seed/` into it (2026-10-20 training: 4 experiments, 30 runs, `xai-credit-scoring@production`).
+So the MLflow UI shows the experiments and the registered model right after a clone. An existing store is never touched.
+
 ### 2. Data pipeline and training (dev container)
 
 Run in order (fully seeded). The dev container has `MLFLOW_TRACKING_URI=http://mlflow:5000`, so every run shows up in the MLflow UI (experiments `nextstep-lr`, `nextstep-lgbm`, `nextstep-xgb`, `nextstep-final`, `nextstep-audit`).
@@ -86,6 +91,11 @@ docker compose --profile dev run --rm dev python -m src.models.train --stage all
 # Register the final model in the Model Registry: xai-credit-scoring, alias production (staging if a charter target is missed)
 docker compose --profile dev run --rm dev python -m src.models.registry
 ```
+
+To keep a new training and registration in the repo, refresh the MLflow snapshot too: run `docker compose stop mlflow`,
+replace `mlflow_seed/mlflow.db` and `mlflow_seed/artifacts/` with the same file and folder from `mlflow_data/`, then
+`docker compose start mlflow`. `tests/test_mlflow_seed.py` checks that the snapshot's production model has the run id in
+`reports/final_summary.json`.
 
 Optional: reports, figures and checks, the actionability Excel, the German Credit secondary model (about 20 seconds)
 
@@ -255,6 +265,7 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 ├── data/                    # raw/ and processed/ (not committed, see data/README.md)
 ├── docs/                    # Experiment report (experiment_report.pdf)
 ├── mlflow_data/             # MLflow server database and artifacts (docker volume, not committed)
+├── mlflow_seed/             # MLflow snapshot (copied into an empty mlflow_data/ on first start)
 ├── models/                  # Trained models ({algorithm}_v{version}.joblib, e.g. xgboost_v1.0.joblib)
 ├── notebooks/               # EDA, simulator, model and audit report scripts (nothing in src/ depends on them)
 ├── reports/                 # Reports (Korean and English), figures/, result tables, actionability Excel, team handoff files

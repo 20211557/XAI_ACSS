@@ -8,6 +8,7 @@
   - **Unset, or a folder path** (e.g. `./mlruns`): a local SQLite database `mlruns/mlflow.db`, with artifacts in `mlruns/artifacts/`, relative to the project root. MLflow 3.16 refuses the plain folder backend, which is why the folder holds a database.
   - **A URI** (for example `http://mlflow:5000`): used as is; the server decides where artifacts go.
 - **Inside docker-compose:** set `MLFLOW_TRACKING_URI` to the compose MLflow server and **rerun training** (`python -m src.models.train --stage all`, about 15 to 25 minutes, seeded). Do not copy the local `mlruns/` folder into a container: its database stores **absolute** artifact paths from the machine where it was created, so the artifacts would not be found.
+- **Snapshot of the compose server:** the server store `mlflow_data/` is gitignored, but a snapshot with the same content is committed as `mlflow_seed/`. On first start the server copies it in when its store is empty (README, How to run, step 1). The server store keeps artifact paths relative to the server (`mlflow-artifacts:/...`), so it works on any machine. That is the difference from a local `mlruns/`.
 - `mlruns/` is gitignored. Browse it locally with `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`.
 
 ## Experiments and runs

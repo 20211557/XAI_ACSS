@@ -1,0 +1,56 @@
+artifact_path: mlflow-artifacts:/4/models/m-22ab372e0c564a659bb288635441e3d4/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.skops
+    predict_fn: predict_proba
+    python_version: 3.12.15
+  sklearn:
+    code: null
+    pickled_model: model.skops
+    serialization_format: skops
+    sklearn_version: 1.9.1
+    skops_trusted_types:
+    - imblearn.pipeline.Pipeline
+    - numpy.dtype
+    - xgboost.core.Booster
+    - xgboost.sklearn.XGBClassifier
+is_signature_from_type_hint: false
+mlflow_version: 3.16.1
+model_id: m-22ab372e0c564a659bb288635441e3d4
+model_size_bytes: 711346
+model_uuid: m-22ab372e0c564a659bb288635441e3d4
+prompts: null
+run_id: c601dc7aa5754b8ebe9c201018c6c835
+saved_input_example_info:
+  artifact_path: input_example.json
+  pandas_orient: split
+  serving_input_path: serving_input_example.json
+  type: dataframe
+signature:
+  inputs: '[{"type": "double", "name": "RevolvingUtilizationOfUnsecuredLines", "required":
+    true}, {"type": "double", "name": "age", "required": true}, {"type": "double",
+    "name": "NumberOfTime30-59DaysPastDueNotWorse", "required": true}, {"type": "double",
+    "name": "DebtRatio", "required": true}, {"type": "double", "name": "MonthlyIncome",
+    "required": true}, {"type": "double", "name": "NumberOfOpenCreditLinesAndLoans",
+    "required": true}, {"type": "double", "name": "NumberOfTimes90DaysLate", "required":
+    true}, {"type": "double", "name": "NumberRealEstateLoansOrLines", "required":
+    true}, {"type": "double", "name": "NumberOfTime60-89DaysPastDueNotWorse", "required":
+    true}, {"type": "double", "name": "NumberOfDependents", "required": true}, {"type":
+    "double", "name": "pastdue_special_code", "required": true}, {"type": "double",
+    "name": "income_missing", "required": true}, {"type": "double", "name": "income_zero",
+    "required": true}, {"type": "double", "name": "util_outlier", "required": true},
+    {"type": "double", "name": "telecom_payment_rate", "required": true}, {"type":
+    "double", "name": "utility_payment_rate", "required": true}, {"type": "double",
+    "name": "telecom_tenure_months", "required": true}, {"type": "double", "name":
+    "insurance_paid_months", "required": true}, {"type": "double", "name": "spending_consistency",
+    "required": true}, {"type": "double", "name": "regular_payment_count", "required":
+    true}, {"type": "double", "name": "app_login_frequency", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float32", "shape": [-1,
+    2]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-10-20 14:06:46.528100'

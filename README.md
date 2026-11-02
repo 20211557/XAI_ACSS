@@ -52,6 +52,7 @@ flowchart LR
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Docker Compose v2.22 이상 포함)
 - 데이터: [data/README.md](data/README.md) 를 따라 `data/raw/cs-training.csv` (필수), `data/raw/german.data` (보조 모델용) 를 넣는다.
   학습된 모델 `models/xgboost_v1.0.joblib` 과 보고서 `reports/` 는 레포에 포함되어 있어, 데이터 없이도 서비스는 실행된다.
+  MLflow 실험 기록과 등록 모델도 스냅샷(`mlflow_seed/`)으로 포함되어 있다 (아래 1 참고).
 
 ### 1. 전체 서비스 실행
 
@@ -69,6 +70,10 @@ docker compose up --build   # docker-compose up 도 동일
 | MLflow UI | http://localhost:5000 |
 
 종료: `docker compose down`
+
+**MLflow 스냅샷:** `mlflow_data/` 는 git 대상이 아니다. 그래서 mlflow 서비스는 처음 시작할 때 `mlflow_data/` 가 비어 있으면
+레포의 스냅샷 `mlflow_seed/` 를 복사한다 (2026-10-20 학습: 실험 4개, 실행 30개, `xai-credit-scoring@production`).
+clone 직후에도 MLflow UI 에서 실험과 등록 모델을 볼 수 있다. 이미 기록이 있으면 건드리지 않는다.
 
 ### 2. 데이터 파이프라인과 모델 학습 (dev 컨테이너)
 
@@ -88,6 +93,10 @@ docker compose --profile dev run --rm dev python -m src.models.train --stage all
 # 최종 모델을 Model Registry 에 등록: xai-credit-scoring, alias production (헌장 목표 미달이면 staging)
 docker compose --profile dev run --rm dev python -m src.models.registry
 ```
+
+다시 학습하고 등록한 결과를 레포에 남기려면 MLflow 스냅샷도 갱신한다. `docker compose stop mlflow` 후
+`mlflow_seed/mlflow.db` 와 `mlflow_seed/artifacts/` 를 `mlflow_data/` 의 같은 파일·폴더로 교체하고 `docker compose start mlflow`.
+`tests/test_mlflow_seed.py` 가 스냅샷의 production 모델이 `reports/final_summary.json` 의 실행 ID 와 같은지 검사한다.
 
 선택: 보고서·그림·점검, 조치 가능성 Excel, German Credit 보조 모델 (약 20초)
 
@@ -257,6 +266,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 ├── data/                    # raw/ · processed/ (git 미추적, data/README.md 참고)
 ├── docs/                    # 실험 리포트 (experiment_report.pdf)
 ├── mlflow_data/             # MLflow 서버 DB·아티팩트 (docker 볼륨, git 미추적)
+├── mlflow_seed/             # MLflow 스냅샷 (처음 시작할 때 빈 mlflow_data/ 로 복사)
 ├── models/                  # 학습된 모델 ({algorithm}_v{version}.joblib, 예: xgboost_v1.0.joblib)
 ├── notebooks/               # EDA·시뮬레이터·모델·점검 보고서 스크립트 (src/ 는 이것에 의존하지 않음)
 ├── reports/                 # 보고서(한국어·영어), figures/, 결과표, 조치 가능성 Excel, 팀 인계 파일

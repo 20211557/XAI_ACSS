@@ -8,6 +8,7 @@
   - **설정하지 않거나 폴더 경로인 경우** (예: `./mlruns`): 프로젝트 루트 기준 `mlruns/mlflow.db` (로컬 SQLite), 아티팩트는 `mlruns/artifacts/`. MLflow 3.16이 일반 폴더 백엔드를 받지 않아 폴더 안에 데이터베이스를 둡니다.
   - **URI인 경우** (예: `http://mlflow:5000`): 그대로 사용하며, 아티팩트 위치는 서버가 정합니다.
 - **docker-compose 안에서는:** `MLFLOW_TRACKING_URI`를 compose의 MLflow 서버로 설정하고 **학습을 다시 실행**하십시오 (`python -m src.models.train --stage all`, 약 15~25분, 시드 고정). 로컬 `mlruns/` 폴더를 컨테이너로 복사하지 마십시오. 그 데이터베이스는 만들어진 컴퓨터의 **절대** 아티팩트 경로를 저장하므로 아티팩트를 찾을 수 없습니다.
+- **compose 서버의 스냅샷:** 서버 저장소 `mlflow_data/`는 git에서 제외되지만, 같은 내용의 스냅샷 `mlflow_seed/`를 커밋해 두었습니다. 서버는 처음 시작할 때 저장소가 비어 있으면 이 스냅샷을 복사합니다 (README 실행 방법 1). 서버 저장소의 아티팩트 경로는 서버 기준 상대 경로(`mlflow-artifacts:/...`)라 다른 컴퓨터에서도 그대로 동작합니다. 이 점이 로컬 `mlruns/`와 다릅니다.
 - `mlruns/`는 git에서 제외됩니다. 로컬에서 보기: `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`.
 
 ## 실험과 실행
