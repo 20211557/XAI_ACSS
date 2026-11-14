@@ -17,9 +17,16 @@ def report_path(key: str) -> Path:
     return get_settings().reports_dir / load_config()["api"]["reports"][key]
 
 
-def source_of(key: str) -> str:
-    """응답의 source 필드: 프로젝트 기준 상대 경로 (예: reports/final_summary.json)."""
-    return f"reports/{load_config()['api']['reports'][key]}"
+def source_of(key: str, **fmt: str) -> str:
+    """응답의 source 필드: 프로젝트 기준 상대 경로 (예: reports/final_summary.json).
+
+    fmt 는 경로의 자리표시자 값이다 (예: lang="ko" → figures/13_shap_summary_ko.png)."""
+    return f"reports/{load_config()['api']['reports'][key].format(**fmt)}"
+
+
+def figure_path(key: str, **fmt: str) -> Path:
+    """reports/ 안의 그림 파일 경로. 경로의 {lang} 같은 자리표시자를 채운다."""
+    return get_settings().reports_dir / load_config()["api"]["reports"][key].format(**fmt)
 
 
 def read_json(key: str) -> dict:

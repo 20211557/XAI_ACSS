@@ -154,7 +154,53 @@ def test_metrics_match_final_summary():
     cm = body["confusion_matrix"]
     assert cm["tn"] + cm["fp"] + cm["fn"] + cm["tp"] == test["rows"]
     assert cm["tp"] / (cm["tp"] + cm["fn"]) == pytest.approx(test["recall"], abs=1e-3)
-    assert body["roc_curve"]["is_dummy"] is True and body["is_dummy"] is False
+    assert body["is_dummy"] is False
+
+
+def test_metrics_curves_are_real_test_set_curves():
+    """ROC / PR points come from the shipped model's test scores (reports/test_curves.json):
+    the approval cutoff sits on both curves at the reported precision and recall."""
+    body = client.get("/metrics").json()
+    test = SUMMARY["test"]
+    roc, pr = body["roc_curve"], body["pr_curve"]
+
+    assert roc["is_dummy"] is False and pr["is_dummy"] is False
+    assert roc["source"] == pr["source"] == "reports/test_curves.json"
+    assert roc["auc"] == pytest.approx(test["auc"], abs=1e-4)
+    assert (roc["fpr"][0], roc["tpr"][0]) == (0.0, 0.0)
+    assert (roc["fpr"][-1], roc["tpr"][-1]) == (1.0, 1.0)
+    assert roc["fpr"] == sorted(roc["fpr"]) and roc["tpr"] == sorted(roc["tpr"])
+    assert len(pr["recall"]) == len(pr["precision"]) == len(pr["score"])
+    op = roc["operating_point"]
+    assert op["recall"] == pytest.approx(test["recall"], abs=1e-4)
+    assert op["precision"] == pytest.approx(test["precision"], abs=1e-4)
+    assert pr["baseline"] == pytest.approx(SUMMARY["default_rate_test"], abs=1e-4)
+
+
+def test_metrics_falls_back_to_marked_dummy_curves_without_the_file(monkeypatch):
+    from src.api import main
+
+    def missing(key):
+        if key == "test_curves":
+            raise FileNotFoundError(key)
+        return original(key)
+
+    original = main.reports.read_json
+    monkeypatch.setattr(main.reports, "read_json", missing)
+    body = client.get("/metrics").json()
+
+    assert body["roc_curve"]["is_dummy"] is True and body["pr_curve"]["is_dummy"] is True
+    assert "src.models.curves" in body["roc_curve"]["note"]
+
+
+def test_summary_plot_image_is_served():
+    """Dashboard XAI tab: the SHAP Summary Plot image (top 15 features) comes over HTTP."""
+    for lang in ("ko", "en"):
+        response = client.get("/explain/global/summary-plot", params={"lang": lang})
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content.startswith(b"\x89PNG")
+    assert client.get("/explain/global/summary-plot", params={"lang": "fr"}).status_code == 422
 
 
 def test_anova_returns_both_tests_with_tukey_when_significant():

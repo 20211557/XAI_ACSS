@@ -3,9 +3,9 @@
 > Educational use only. Not for real financial decisions. The alternative data is simulated, and the simulator uses the target for every row, so the effect of the alternative variables is larger than it would be in reality.
 
 - Scope: the shipped model (`models/xgboost_v1.0.joblib`, XGBoost, 21 features, 13 monotone constraints). Global explanations use the **test set**, 22,500 applicants.
-- Code: `src/explainer/shap_explainer.py` (TreeExplainer), `src/explainer/global_shap.py` (global figures), `src/explainer/reasons.py` (rejection reason sentences). Settings: `explainer` in `configs/config.yaml`.
-- Run: `python -m src.explainer.global_shap` (see the README for passing a Korean font). API: `POST /explain` (local explanation, rejection reasons), `GET /explain/global` (global top 10). Dashboard: "XAI 분석" tab (waterfall).
-- Figures: `reports/figures/13_shap_summary_{ko,en}.png`, `reports/figures/14_shap_dependence_{ko,en}.png`.
+- Code: `src/explainer/shap_explainer.py` (TreeExplainer), `src/explainer/global_shap.py` (global figures), `src/explainer/waterfall.py` (per-applicant figures), `src/explainer/reasons.py` (rejection reason sentences). Settings: `explainer` in `configs/config.yaml`.
+- Run: `python -m src.explainer.global_shap`, `python -m src.explainer.waterfall` (see the README for passing a Korean font). API: `POST /explain` (local explanation, rejection reasons), `GET /explain/global` (global top 10), `GET /explain/global/summary-plot` (Summary Plot image). Dashboard: "XAI 분석" tab (Summary Plot image, waterfall for the entered applicant, rejection reasons).
+- Figures: `reports/figures/13_shap_summary_{ko,en}.png`, `reports/figures/14_shap_dependence_{ko,en}.png`, `reports/figures/15_shap_waterfall_{rejected,approved}_{ko,en}.png`.
 
 ## 1. What SHAP is
 
@@ -61,6 +61,13 @@ Each panel shows how the SHAP value (vertical) changes with the feature value (h
 ## 3. Local explanation: why was this applicant declined?
 
 `POST /explain` computes SHAP values for one applicant. The dashboard draws them as a **waterfall plot**: bars that start at the base value and add each feature's SHAP value until they reach the final log-odds. Bars to the right (red) raised risk; bars to the left (green) lowered it.
+
+### Waterfall plot images (`15_shap_waterfall_*_en.png`)
+
+`python -m src.explainer.waterfall` saves the same explanation as images. It covers the API's 2 example applicants, the same inputs as the dashboard's "거절 예시" (rejected example) and "승인 예시" (approved example) buttons. The figures use the shap library's waterfall format (red = raised risk, blue = lowered it), drawing the 9 largest effects one by one and grouping the rest in one row (`explainer.waterfall_max_display` = 10 rows). The gray numbers before the feature names are the inputs.
+
+- **Rejected example** (score 454, default probability 13.19%): revolving utilization of 95% (+0.50) and 2 late payments of 30 to 59 days (+0.48) raised the risk most. The log-odds rise from the base value −2.675 to −1.885.
+- **Approved example** (score 867, default probability 0.05%): alternative features such as 22 months of health insurance and pension payments (−1.06), 25 app logins (−1.03) and 16 recurring payments (−0.63) lower the risk sharply, ending at −7.618.
 
 Below are the API responses for 2 real declined applicants from the test set (applicants without cleaning flags; the model score and the API score were checked to match).
 

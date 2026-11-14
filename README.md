@@ -125,6 +125,20 @@ docker compose --profile dev run --rm -v C:/Windows/Fonts/NanumGothic.ttf:/fonts
   -e KO_FONT_PATH=/fonts/ko.ttf dev python -m src.explainer.global_shap   # 약 10초
 ```
 
+개별 고객 SHAP Waterfall Plot (API 의 거절·승인 예시 고객 → `reports/figures/15_*`, 한/영). 폰트는 위와 같이 넘긴다.
+
+```bash
+docker compose --profile dev run --rm -v C:/Windows/Fonts/NanumGothic.ttf:/fonts/ko.ttf:ro \
+  -e KO_FONT_PATH=/fonts/ko.ttf dev python -m src.explainer.waterfall   # 몇 초
+```
+
+test 세트 ROC·PR 곡선 (배포 모델의 test 점수 → `reports/test_curves.json`, `/metrics` 와 대시보드가 읽음).
+다시 학습하면 함께 다시 실행한다 (`tests/test_curves.py` 가 `reports/final_summary.json` 과 맞는지 검사).
+
+```bash
+docker compose --profile dev run --rm dev python -m src.models.curves   # 몇 초
+```
+
 ### 3. 개발 환경 (dev 컨테이너)
 
 Python 3.12 와 전체 라이브러리가 설치된 컨테이너에 레포 전체가 `/app` 으로 마운트된다.
@@ -190,8 +204,9 @@ pytest
 
 ## API 엔드포인트
 
-Swagger UI: http://localhost:8000/docs (요청 예시 포함). 응답의 `is_dummy` 가 `true` 인 값은 아직 계산할 수 없어
-넣은 예시 값이며, 대시보드에는 🟡 **더미 데이터** 로 표시된다 (`src/api/dummy.py`).
+Swagger UI: http://localhost:8000/docs (요청 예시 포함). 응답의 `is_dummy` 가 `true` 인 값은 실제 값을 쓸 수 없어
+넣은 예시 값이며, 대시보드에는 🟡 **더미 데이터** 로 표시된다 (`src/api/dummy.py`). 지금은 `reports/test_curves.json` 이
+없거나 배포 모델과 다를 때의 ROC·PR 곡선만 해당한다.
 
 | 엔드포인트 | 메서드 | 내용 | 데이터 |
 | --- | --- | --- | --- |
@@ -200,9 +215,10 @@ Swagger UI: http://localhost:8000/docs (요청 예시 포함). 응답의 `is_dum
 | `/explain` | POST | 거절 사유 Top 5 (feature, current_value, shap_contribution, explanation), 변수별 SHAP | 실제 (배포 모델 + SHAP) |
 | `/fairness` | GET | 성별·연령대 DI Ratio, Equalized Odds (TPR/FPR 차이), 집단별 승인율 | 실제 (`reports/fairness/fairness_metrics.json`) |
 | `/fairness/mitigation` | GET | Mitigation 전/후 비교 (적용 후 = 가중치 재학습, 성능 변화는 `note`) | 실제 (`reports/fairness/mitigation.json`) |
-| `/metrics` | GET | AUC, KS, Precision, Recall, F1, 혼동행렬, 등급표 | 실제 (`reports/final_summary.json`), **ROC/PR 곡선 좌표: 더미** |
+| `/metrics` | GET | AUC, KS, Precision, Recall, F1, 혼동행렬, ROC·PR 곡선 (승인 기준 지점 포함), 등급표 | 실제 (`reports/final_summary.json`, 곡선은 `reports/test_curves.json`) |
 | `/anova` | GET | One-way ANOVA 2종 (F, p, η²), Tukey HSD | 실제 (`reports/cv_fold_auc.csv`) |
 | `/explain/global` | GET | 전역 SHAP 중요도 (대시보드용) | 실제 (Top 10, `reports/shap_global_top10.csv`) |
+| `/explain/global/summary-plot` | GET | SHAP Summary Plot 이미지 (상위 15개, PNG, `lang=ko\|en`, 대시보드 XAI 탭용) | 실제 (`reports/figures/13_shap_summary_*.png`) |
 | `/features` | GET | 입력 변수 설명·범위·기본값 (대시보드 입력 폼용) | 실제 |
 
 - 고객 입력 JSON 의 키는 학습 데이터 컬럼명이다 (예: `NumberOfTimes90DaysLate`). 값이 `null` 이면 학습 데이터 중앙값으로
@@ -274,8 +290,8 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 │   ├── config.py            # 환경 변수(.env) + configs/config.yaml 로더
 │   ├── utils/               # 로거 등 공통 유틸
 │   ├── data/                # loader, preprocessor, simulator, features(씬파일러 판정), actionability_table
-│   ├── models/              # train, evaluate, scoring, german, registry(Model Registry 등록), predictor(서빙)
-│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (거절 사유 문장), global_shap (전역 그림)
+│   ├── models/              # train, evaluate, scoring, german, registry(Model Registry 등록), predictor(서빙), curves(test ROC·PR 곡선)
+│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (거절 사유 문장), global_shap (전역 그림), waterfall (개별 고객 그림)
 │   ├── fairness/            # DI Ratio, Equalized Odds, Bias Mitigation
 │   ├── statistics/          # anova.py (One-way ANOVA, η², Tukey HSD)
 │   ├── api/                 # FastAPI (main.py, schemas.py, reports.py, dummy.py)
@@ -372,12 +388,12 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 - [x] 13. AUC-ROC, KS 통계량 계산 모듈 개발
 - [x] 14. 씬파일러 집단 대안 데이터 효과 분석
 - [x] 15. ANOVA 통계 검증 모듈 개발 (2가지 검증 + Tukey HSD) · `src/statistics/anova.py`, [리포트](reports/anova_report_ko.md)
-- [x] 16. SHAP TreeExplainer 적용 및 전역 해석 시각화 · `src/explainer/global_shap.py`: Summary Plot (상위 15개), Dependence Plot 4개 (`reports/figures/13_*`, `14_*`). 대시보드는 Top 10 막대
-- [x] 17. SHAP 지역 해석 (Force Plot, Waterfall) 구현 · 대시보드 Waterfall
+- [x] 16. SHAP TreeExplainer 적용 및 전역 해석 시각화 · `src/explainer/global_shap.py`: Summary Plot (상위 15개), Dependence Plot 4개 (`reports/figures/13_*`, `14_*`). 대시보드 XAI 탭에 Summary Plot 이미지 (API 로 전달)
+- [x] 17. SHAP 지역 해석 (Force Plot, Waterfall) 구현 · `src/explainer/waterfall.py`: 예시 고객 Waterfall Plot 이미지 (`reports/figures/15_*`). 대시보드는 입력한 고객의 Waterfall
 - [x] 18. 거절 사유 Top 5 자동 생성 로직 개발
 - [x] 19. 공정성 지표 계산 모듈 (DI Ratio, Equalized Odds) · `src/fairness/metrics.py`
 - [x] 20. Bias Mitigation 구현 (Reweighting, Threshold Adjustment) · `src/fairness/mitigation.py`, [리포트](reports/fairness_report_ko.md)
-- [x] 21. FastAPI 서버 구현 (7개 엔드포인트) · 더미 부분: ROC/PR 곡선
+- [x] 21. FastAPI 서버 구현 (7개 엔드포인트) · ROC·PR 곡선은 test 세트 실제 점수 (`src/models/curves.py`)
 - [x] 22. Pydantic 스키마 정의 및 Swagger UI 설정
 - [x] 23. Streamlit 대시보드 구현 (5개 탭)
 - [x] 24. API ↔ 대시보드 연동 테스트

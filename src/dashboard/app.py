@@ -258,21 +258,26 @@ def tab_xai() -> None:
     glob = fetch("explain_global")
     left, right = st.columns(2)
     with left:
-        df = pd.DataFrame(glob["features"]).sort_values("mean_abs_shap")
-        fig = go.Figure(
-            go.Bar(
-                x=df["mean_abs_shap"],
-                y=[short(n) for n in df["feature_name_kr"]],
-                orientation="h",
-                marker_color=SERIES[0],
-                hovertext=df["actionability"],
+        st.markdown("**SHAP Summary Plot** · 전역 해석 (test 세트, 상위 15개 변수)")
+        st.image(fetch("summary_plot"), width="stretch")
+        st.caption(
+            "점 하나 = 신청자 한 명. 오른쪽일수록 부도 위험을 높였고, 색은 변수 값입니다 "
+            "(주황 = 높음, 파랑 = 낮음). ✅ 실제 데이터 · reports/figures/13_shap_summary_ko.png"
+        )
+        with st.expander("평균 |SHAP| 막대 그래프 (상위 10개, 조치 가능성 표시)"):
+            df = pd.DataFrame(glob["features"]).sort_values("mean_abs_shap")
+            fig = go.Figure(
+                go.Bar(
+                    x=df["mean_abs_shap"],
+                    y=[short(n) for n in df["feature_name_kr"]],
+                    orientation="h",
+                    marker_color=SERIES[0],
+                    hovertext=df["actionability"],
+                )
             )
-        )
-        fig.update_layout(
-            title="SHAP Summary · 전역 변수 중요도 (평균 |SHAP|)", xaxis_title="평균 |SHAP|"
-        )
-        chart(fig, height=420)
-        source_caption(glob["is_dummy"], glob["source"], glob["note"])
+            fig.update_layout(title="전역 변수 중요도 (평균 |SHAP|)", xaxis_title="평균 |SHAP|")
+            chart(fig, height=420)
+            source_caption(glob["is_dummy"], glob["source"], glob["note"])
     with right:
         exp = st.session_state.get("explanation")
         if not exp:
@@ -413,6 +418,33 @@ def tab_fairness() -> None:
 # ---------------------------------------------------------------------------
 # 4. 모델 성능
 # ---------------------------------------------------------------------------
+def _score_hover(curve: dict, x_name: str, y_name: str) -> dict:
+    """Hover text with the score cutoff of each point (real curves only)."""
+    scores = curve.get("score")
+    if not scores:
+        return {}
+    return {
+        "customdata": ["-" if s is None else s for s in scores],
+        "hovertemplate": f"{x_name} %{{x:.3f}}<br>{y_name} %{{y:.3f}}"
+        "<br>%{customdata}점 이하 거절<extra></extra>",
+    }
+
+
+def _add_operating_point(fig: go.Figure, op: dict | None, x_key: str, y_key: str) -> None:
+    """Marks where the actual approval rule (score cutoff) sits on the curve."""
+    if not op:
+        return
+    fig.add_scatter(
+        x=[op[x_key]],
+        y=[op[y_key]],
+        mode="markers",
+        name=f"승인 기준 {op['cutoff_score']}점",
+        marker={"color": RISK_UP, "size": 12, "symbol": "diamond"},
+        hovertemplate=f"승인 기준 {op['cutoff_score']}점<br>"
+        f"{x_key} {op[x_key]:.3f}, {y_key} {op[y_key]:.3f}<extra></extra>",
+    )
+
+
 def tab_performance() -> None:
     m = fetch("metrics")
     cols = st.columns(5)
@@ -456,26 +488,33 @@ def tab_performance() -> None:
             x=roc["fpr"],
             y=roc["tpr"],
             mode="lines",
-            name=f"모델 (AUC {m['auc']:.3f})",
+            name=f"모델 (AUC {roc.get('auc') or m['auc']:.3f})",
             line={"color": SERIES[0], "width": 3},
+            **_score_hover(roc, "FPR", "TPR"),
         )
         fig.add_scatter(
             x=[0, 1], y=[0, 1], mode="lines", name="무작위", line={"dash": "dash", "color": NEUTRAL}
         )
+        _add_operating_point(fig, roc.get("operating_point"), "fpr", "tpr")
         fig.update_layout(
-            title="ROC Curve", xaxis_title="FPR", yaxis_title="TPR", legend={"x": 0.45, "y": 0.1}
+            title="ROC Curve",
+            xaxis_title="FPR (상환자 중 거절 비율)",
+            yaxis_title="TPR (부도자 중 거절 비율)",
+            legend={"x": 0.35, "y": 0.05},
         )
         chart(fig)
-        source_caption(roc["is_dummy"], note=roc["note"])
+        source_caption(roc["is_dummy"], roc.get("source"), roc["note"])
     with mid:
         pr = m["pr_curve"]
         fig = go.Figure()
+        ap = pr.get("average_precision")
         fig.add_scatter(
             x=pr["recall"],
             y=pr["precision"],
             mode="lines",
-            name="모델",
+            name=f"모델 (AP {ap:.3f})" if ap is not None else "모델",
             line={"color": SERIES[0], "width": 3},
+            **_score_hover(pr, "Recall", "Precision"),
         )
         fig.add_hline(
             y=pr["baseline"],
@@ -483,14 +522,16 @@ def tab_performance() -> None:
             line_color=NEUTRAL,
             annotation_text=f"부도율 {pr['baseline']:.3f}",
         )
+        _add_operating_point(fig, pr.get("operating_point"), "recall", "precision")
         fig.update_layout(
             title="Precision-Recall Curve",
-            xaxis_title="Recall",
-            yaxis_title="Precision",
-            showlegend=False,
+            xaxis_title="Recall (부도자 중 거절 비율)",
+            yaxis_title="Precision (거절자 중 부도 비율)",
+            yaxis={"range": [0, 1.02]},
+            legend={"x": 0.02, "y": 0.05},
         )
         chart(fig)
-        source_caption(pr["is_dummy"], note=pr["note"])
+        source_caption(pr["is_dummy"], pr.get("source"), pr["note"])
     with right:
         cm = m["confusion_matrix"]
         z = [[cm["tn"], cm["fp"]], [cm["fn"], cm["tp"]]]

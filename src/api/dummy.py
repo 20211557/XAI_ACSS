@@ -1,7 +1,7 @@
-"""더미 데이터: 아직 실제로 계산할 수 없는 값. 응답에는 is_dummy=True 로 표시한다.
+"""더미 데이터: 실제 값을 쓸 수 없을 때의 예시 값. 응답에는 is_dummy=True 로 표시한다.
 
-- ROC / PR 곡선 좌표: test 세트 점수 파일(data/processed/final_test_scores.csv)이 레포에 없다
-실제 구현이 생기면 이 모듈의 함수를 그 결과로 바꾼다.
+- ROC / PR 곡선 좌표: 평소에는 reports/test_curves.json (python -m src.models.curves, 배포 모델의
+  test 세트 실제 점수) 을 쓴다. 이 파일이 없거나 배포 모델과 다를 때만 아래 근사 곡선을 쓴다.
 """
 
 from __future__ import annotations

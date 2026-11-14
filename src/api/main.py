@@ -2,11 +2,13 @@
 
 과제 명세 엔드포인트 7개:
   /health, /predict, /explain, /fairness, /fairness/mitigation, /metrics, /anova
-대시보드용 추가: /features (입력 폼 정보), /explain/global (전역 SHAP)
+대시보드용 추가: /features (입력 폼 정보), /explain/global (전역 SHAP),
+               /explain/global/summary-plot (SHAP Summary Plot 이미지)
 
 실제 값: 배포 모델(/predict, /explain),
         reports/ 산출물(/metrics, /fairness, /fairness/mitigation, /anova, /explain/global).
-더미 값: ROC/PR 곡선 좌표 → 응답에 is_dummy 로 표시 (src/api/dummy.py).
+더미 값: reports/test_curves.json 이 없거나 배포 모델과 다를 때의 ROC/PR 곡선만 예시 값으로
+        그리고 is_dummy 로 표시한다 (src/api/dummy.py).
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from src.api import dummy, reports
 from src.api.schemas import (
@@ -196,8 +199,32 @@ def explain_global() -> GlobalShapResponse:
         source=reports.source_of("shap_global"),
         is_dummy=False,
         note=f"모델 보고서의 test 세트 평균 |SHAP| 상위 {len(rows)}개. 과제 기준 Summary Plot "
-        "(상위 15개)은 reports/figures/13_shap_summary_ko.png (src/explainer/global_shap.py)",
+        "(상위 15개) 이미지는 GET /explain/global/summary-plot "
+        "(reports/figures/13_shap_summary_ko.png, src/explainer/global_shap.py)",
     )
+
+
+@app.get(
+    "/explain/global/summary-plot",
+    response_class=FileResponse,
+    tags=["xai"],
+    summary="SHAP Summary Plot 이미지 (test 세트, 상위 15개 변수, PNG)",
+    responses={
+        200: {"content": {"image/png": {}}, "description": "PNG 이미지"},
+        404: {"description": "그림 파일이 없음 (python -m src.explainer.global_shap 으로 생성)"},
+    },
+)
+def explain_global_summary_plot(
+    lang: Literal["ko", "en"] = Query("ko", description="그림 언어"),
+) -> FileResponse:
+    path = reports.figure_path("shap_summary_plot", lang=lang)
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"{reports.source_of('shap_summary_plot', lang=lang)} 가 없습니다 "
+            "(python -m src.explainer.global_shap 으로 생성)",
+        )
+    return FileResponse(path, media_type="image/png")
 
 
 @app.get(
@@ -295,6 +322,36 @@ def fairness_mitigation() -> MitigationResponse:
     )
 
 
+def _curves(summary: dict) -> tuple[dict, dict]:
+    """ROC / PR 곡선: 배포 모델의 test 세트 실제 점수 (reports/test_curves.json).
+
+    파일이 없거나 다른 모델의 곡선이면 보고된 AUC 와 같은 이항정규 근사 곡선(더미)을 돌려준다."""
+    try:
+        curves = reports.read_json("test_curves")
+    except FileNotFoundError:
+        curves = None
+    if curves is None or curves.get("model_file") != summary["model_file"]:
+        auc, prevalence = summary["test"]["auc"], summary["default_rate_test"]
+        roc, pr = dummy.curves(auc, prevalence, config["api"]["curve_points"])
+        reason = "곡선 파일이 없어" if curves is None else "곡선 파일이 배포 모델과 달라"
+        note = (
+            f"{reason}, 보고된 AUC 와 같은 이항정규 근사 곡선을 그린 예시 값이다 "
+            "(python -m src.models.curves 로 다시 만든다)"
+        )
+        return {**roc, "is_dummy": True, "note": note}, {**pr, "is_dummy": True, "note": note}
+    source = reports.source_of("test_curves")
+    op = curves["operating_point"]
+    note = (
+        f"{curves['evaluated_on']} 세트 {curves['rows']:,}명의 실제 점수 (배포 모델). "
+        f"양성 = 부도 = 거절, 점 {len(curves['pr']['recall'])}개. "
+        f"◆ = 승인 기준 {op['cutoff_score']}점"
+    )
+    common = {"operating_point": op, "source": source, "is_dummy": False, "note": note}
+    roc = {**curves["roc"], "auc": curves["auc"], **common}
+    pr = {**curves["pr"], "average_precision": curves["average_precision"], **common}
+    return roc, pr
+
+
 @app.get(
     "/metrics",
     response_model=MetricsResponse,
@@ -304,10 +361,7 @@ def fairness_mitigation() -> MitigationResponse:
 def metrics() -> MetricsResponse:
     summary = reports.read_json("final_summary")
     t = summary["test"]
-    roc, pr = dummy.curves(t["auc"], summary["default_rate_test"], config["api"]["curve_points"])
-    curve_note = (
-        "test 세트 점수 파일이 없어, 보고된 AUC 와 같은 이항정규 근사 곡선을 그린 예시 값이다"
-    )
+    roc, pr = _curves(summary)
     grades = reports.read_csv("grade_table")
     return MetricsResponse(
         auc=t["auc"],
@@ -333,8 +387,8 @@ def metrics() -> MetricsResponse:
             "note": "반올림된 test 지표(행 수, 부도율, 정밀도, 재현율)로 복원한 근사값 "
             "(칸마다 몇 건 이내 오차)",
         },
-        roc_curve={**roc, "is_dummy": True, "note": curve_note},
-        pr_curve={**pr, "is_dummy": True, "note": curve_note},
+        roc_curve=roc,
+        pr_curve=pr,
         grade_table=grades.to_dict(orient="records"),
         source=f"{reports.source_of('final_summary')}, {reports.source_of('grade_table')}",
         is_dummy=False,

@@ -3,9 +3,9 @@
 > 교육용으로만 사용합니다. 실제 금융 의사결정에 사용하지 마십시오. 대안 데이터는 시뮬레이션 값이며, 시뮬레이터가 모든 행에 타깃을 사용하므로 대안 변수의 영향은 실제보다 큽니다.
 
 - 대상: 배포 모델 (`models/xgboost_v1.0.joblib`, XGBoost, 변수 21개, 단조 제약 13개). 전역 해석은 **test 세트** 22,500명.
-- 코드: `src/explainer/shap_explainer.py` (TreeExplainer), `src/explainer/global_shap.py` (전역 그림), `src/explainer/reasons.py` (거절 사유 문장). 설정: `configs/config.yaml`의 `explainer`.
-- 실행: `python -m src.explainer.global_shap` (한글 폰트 전달 방법은 README 참고). API: `POST /explain` (지역 해석, 거절 사유), `GET /explain/global` (전역 Top 10). 대시보드: "XAI 분석" 탭 (Waterfall).
-- 그림: `reports/figures/13_shap_summary_{ko,en}.png`, `reports/figures/14_shap_dependence_{ko,en}.png`.
+- 코드: `src/explainer/shap_explainer.py` (TreeExplainer), `src/explainer/global_shap.py` (전역 그림), `src/explainer/waterfall.py` (개별 고객 그림), `src/explainer/reasons.py` (거절 사유 문장). 설정: `configs/config.yaml`의 `explainer`.
+- 실행: `python -m src.explainer.global_shap`, `python -m src.explainer.waterfall` (한글 폰트 전달 방법은 README 참고). API: `POST /explain` (지역 해석, 거절 사유), `GET /explain/global` (전역 Top 10), `GET /explain/global/summary-plot` (Summary Plot 이미지). 대시보드: "XAI 분석" 탭 (Summary Plot 이미지, 입력한 고객의 Waterfall, 거절 사유).
+- 그림: `reports/figures/13_shap_summary_{ko,en}.png`, `reports/figures/14_shap_dependence_{ko,en}.png`, `reports/figures/15_shap_waterfall_{rejected,approved}_{ko,en}.png`.
 
 ## 1. SHAP이란
 
@@ -61,6 +61,13 @@ SHAP은 모델의 예측 하나를 **변수별 기여도의 합**으로 나눕�
 ## 3. 지역 해석: 이 신청자는 왜 거절됐는가
 
 `POST /explain`은 신청자 한 명의 SHAP 값을 계산합니다. 대시보드는 이것을 **Waterfall Plot**으로 그립니다. 기준값에서 시작해 변수별 SHAP 값을 하나씩 더해 가며 최종 log-odds에 도착하는 막대 그림입니다. 막대가 오른쪽 (빨강)이면 위험을 높인 변수, 왼쪽 (초록)이면 낮춘 변수입니다.
+
+### Waterfall Plot 이미지 (`15_shap_waterfall_*_ko.png`)
+
+`python -m src.explainer.waterfall`은 같은 설명을 이미지로 저장합니다. 대상은 API의 예시 고객 2명으로, 대시보드의 "거절 예시", "승인 예시" 버튼과 같은 입력입니다. shap 라이브러리의 Waterfall Plot 형식이며 (빨강 = 위험 증가, 파랑 = 위험 감소), 영향이 큰 변수 9개를 따로 그리고 나머지는 한 줄로 묶습니다 (`explainer.waterfall_max_display` = 10줄). 변수 이름 앞의 회색 숫자는 입력값입니다.
+
+- **거절 예시** (점수 454, 부도 확률 13.19%): 리볼빙 한도 사용률 95% (+0.50)와 30~59일 연체 2회 (+0.48)가 위험을 가장 많이 높였습니다. 기준값 −2.675에서 −1.885로 올라갑니다.
+- **승인 예시** (점수 867, 부도 확률 0.05%): 건강보험·국민연금 납부 22개월 (−1.06), 앱 로그인 25회 (−1.03), 정기결제 16건 (−0.63) 같은 대안 변수가 위험을 크게 낮춰 −7.618에 도착합니다.
 
 아래는 test 세트에서 고른 실제 거절자 2명의 API 응답입니다 (정제 플래그가 없는 신청자, 모델 점수와 API 점수 일치 확인).
 
