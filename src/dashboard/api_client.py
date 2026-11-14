@@ -21,7 +21,7 @@ class ApiClient:
         self.base_url = (base_url or get_settings().api_url).rstrip("/")
         self.timeout = timeout
 
-    def _request(self, method: str, path: str, **kwargs) -> Any:
+    def _raw(self, method: str, path: str, **kwargs) -> requests.Response:
         response = requests.request(
             method, f"{self.base_url}{path}", timeout=self.timeout, **kwargs
         )
@@ -31,7 +31,10 @@ class ApiClient:
             except ValueError:
                 detail = response.text
             raise ApiError(f"{method} {path} → {response.status_code}: {detail}")
-        return response.json()
+        return response
+
+    def _request(self, method: str, path: str, **kwargs) -> Any:
+        return self._raw(method, path, **kwargs).json()
 
     def _get(self, path: str, **params) -> Any:
         return self._request("GET", path, params={k: v for k, v in params.items() if v is not None})
@@ -58,6 +61,10 @@ class ApiClient:
 
     def explain_global(self) -> dict:
         return self._get("/explain/global")
+
+    def summary_plot(self, lang: str = "ko") -> bytes:
+        """SHAP Summary Plot PNG (test 세트, 상위 15개 변수)."""
+        return self._raw("GET", "/explain/global/summary-plot", params={"lang": lang}).content
 
     def fairness(self, attribute: str | None = None) -> dict:
         return self._get("/fairness", attribute=attribute)

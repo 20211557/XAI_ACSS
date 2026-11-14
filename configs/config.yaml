@@ -34,6 +34,8 @@ explainer:
     - RevolvingUtilizationOfUnsecuredLines
     - age
     - NumberOfTimes90DaysLate
+  # 개별 고객 Waterfall Plot 의 줄 수: 영향이 큰 변수 9개 + 나머지를 묶은 1줄 (python -m src.explainer.waterfall)
+  waterfall_max_display: 10
   rejection_reasons_top_k: 5
   rejection_reasons_min: 3
   rejection_reason_min_contribution: 0.01   # |기여도| 가 이보다 작은 변수는 거절 사유에서 뺀다 (log-odds)
@@ -114,7 +116,11 @@ api:
     fairness_metrics: fairness/fairness_metrics.json  # python -m src.fairness
     fairness_mitigation: fairness/mitigation.json     # python -m src.fairness.mitigation
     shap_global: shap_global_top10.csv     # notebooks/model_report.py
-  curve_points: 50                         # ROC / PR 곡선 좌표 수
+    shap_summary_plot: figures/13_shap_summary_{lang}.png  # python -m src.explainer.global_shap
+    test_curves: test_curves.json          # python -m src.models.curves (test 세트 ROC / PR 곡선)
+  # ROC / PR 곡선에서 고를 기준점 수 (python -m src.models.curves). 예측 부도 건수를 로그 간격으로
+  # 나눠 곡선이 빠르게 변하는 낮은 FPR 구간에 점을 더 둔다
+  curve_points: 100
 
 dashboard:
   # 리스크 등급별 위험도 색상 (고위험 = 빨강, 중위험 = 노랑, 저위험 = 초록)

@@ -124,6 +124,21 @@ docker compose --profile dev run --rm -v C:/Windows/Fonts/NanumGothic.ttf:/fonts
   -e KO_FONT_PATH=/fonts/ko.ttf dev python -m src.explainer.global_shap   # about 10 seconds
 ```
 
+SHAP waterfall plots for individual applicants (the API's rejected and approved examples → `reports/figures/15_*`,
+Korean and English). Pass the font as above.
+
+```bash
+docker compose --profile dev run --rm -v C:/Windows/Fonts/NanumGothic.ttf:/fonts/ko.ttf:ro \
+  -e KO_FONT_PATH=/fonts/ko.ttf dev python -m src.explainer.waterfall   # a few seconds
+```
+
+Test-set ROC and PR curves (the shipped model's test scores → `reports/test_curves.json`, read by `/metrics` and the
+dashboard). Rerun after retraining (`tests/test_curves.py` checks the file against `reports/final_summary.json`).
+
+```bash
+docker compose --profile dev run --rm dev python -m src.models.curves   # a few seconds
+```
+
 ### 3. Development environment (dev container)
 
 A container with Python 3.12 and every library, with the whole repo mounted at `/app`.
@@ -189,8 +204,9 @@ Some tests need files that are not committed (`data/processed/*.csv`, `mlruns/`)
 
 ## API endpoints
 
-Swagger UI: http://localhost:8000/docs (with request examples). Values with `is_dummy: true` cannot be computed yet and
-are placeholders; the dashboard marks them 🟡 **dummy data** (`src/api/dummy.py`).
+Swagger UI: http://localhost:8000/docs (with request examples). Values with `is_dummy: true` are placeholders used when
+the real values are not available; the dashboard marks them 🟡 **dummy data** (`src/api/dummy.py`). Today this only
+applies to the ROC and PR curves when `reports/test_curves.json` is missing or belongs to another model.
 
 | Endpoint | Method | Returns | Data |
 | --- | --- | --- | --- |
@@ -199,9 +215,10 @@ are placeholders; the dashboard marks them 🟡 **dummy data** (`src/api/dummy.p
 | `/explain` | POST | Top 5 rejection reasons (feature, current_value, shap_contribution, explanation), SHAP per feature | Real (shipped model + SHAP) |
 | `/fairness` | GET | DI ratio and equalized odds (TPR/FPR gaps) by gender and age band, approval rate per group | Real (`reports/fairness/fairness_metrics.json`) |
 | `/fairness/mitigation` | GET | Before/after mitigation (after = reweighting; performance change in `note`) | Real (`reports/fairness/mitigation.json`) |
-| `/metrics` | GET | AUC, KS, precision, recall, F1, confusion matrix, grade table | Real (`reports/final_summary.json`); **ROC/PR curve points: dummy** |
+| `/metrics` | GET | AUC, KS, precision, recall, F1, confusion matrix, ROC and PR curves (with the approval cutoff point), grade table | Real (`reports/final_summary.json`; curves from `reports/test_curves.json`) |
 | `/anova` | GET | Two one-way ANOVAs (F, p, eta squared), Tukey HSD | Real (`reports/cv_fold_auc.csv`) |
 | `/explain/global` | GET | Global SHAP importance (for the dashboard) | Real (top 10, `reports/shap_global_top10.csv`) |
+| `/explain/global/summary-plot` | GET | SHAP Summary Plot image (top 15, PNG, `lang=ko\|en`, for the dashboard XAI tab) | Real (`reports/figures/13_shap_summary_*.png`) |
 | `/features` | GET | Input variables with labels, ranges, defaults (for the dashboard form) | Real |
 
 - Customer JSON keys are the training column names (e.g. `NumberOfTimes90DaysLate`). `null` means missing and is imputed with
@@ -273,8 +290,8 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 │   ├── config.py            # Environment variables (.env) + configs/config.yaml loader
 │   ├── utils/               # Shared utilities such as the logger
 │   ├── data/                # loader, preprocessor, simulator, features (thin-filer rule), actionability_table
-│   ├── models/              # train, evaluate, scoring, german, registry (Model Registry), predictor (serving)
-│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (rejection reason sentences), global_shap (global figures)
+│   ├── models/              # train, evaluate, scoring, german, registry (Model Registry), predictor (serving), curves (test ROC and PR curves)
+│   ├── explainer/           # shap_explainer (TreeExplainer), reasons (rejection reason sentences), global_shap (global figures), waterfall (per-applicant figures)
 │   ├── fairness/            # DI ratio, equalized odds, bias mitigation
 │   ├── statistics/          # anova.py (one-way ANOVA, eta squared, Tukey HSD)
 │   ├── api/                 # FastAPI (main.py, schemas.py, reports.py, dummy.py)

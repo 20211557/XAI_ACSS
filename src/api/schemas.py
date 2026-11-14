@@ -253,9 +253,26 @@ class ConfusionMatrix(BaseModel):
     note: str
 
 
+class OperatingPoint(BaseModel):
+    """실제 승인 규칙(점수 기준)에서의 곡선 위 위치. 양성 = 부도 = 거절."""
+
+    cutoff_score: int = Field(..., description="승인 기준 점수 (이 점수 미만이면 거절)")
+    rejected: int
+    fpr: float = Field(..., description="상환자 중 거절 비율")
+    tpr: float = Field(..., description="부도자 중 거절 비율 (= recall)")
+    recall: float
+    precision: float = Field(..., description="거절자 중 실제 부도 비율")
+
+
 class RocCurve(BaseModel):
     fpr: list[float]
     tpr: list[float]
+    score: list[int | None] | None = Field(
+        None, description="점마다 거절로 보는 최고 점수 (이 점수 이하 거절). 첫 점 (0, 0) 은 없음"
+    )
+    auc: float | None = Field(None, description="test 세트 전체 점수로 계산한 AUC")
+    operating_point: OperatingPoint | None = None
+    source: str | None = None
     is_dummy: bool
     note: str
 
@@ -263,7 +280,11 @@ class RocCurve(BaseModel):
 class PrCurve(BaseModel):
     recall: list[float]
     precision: list[float]
-    baseline: float
+    score: list[int] | None = Field(None, description="점마다 거절로 보는 최고 점수")
+    baseline: float = Field(..., description="부도율 (무작위 모델의 정밀도)")
+    average_precision: float | None = Field(None, description="Average Precision (PR 곡선 면적)")
+    operating_point: OperatingPoint | None = None
+    source: str | None = None
     is_dummy: bool
     note: str
 
