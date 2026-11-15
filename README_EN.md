@@ -70,6 +70,10 @@ docker compose up --build   # same as docker-compose up
 
 Stop: `docker compose down`
 
+By default the ports are open on this computer only (IPv4 `127.0.0.1`, IPv6 `::1`). To demo from another device on the
+same network, put `BIND_ADDRESS=0.0.0.0` and `BIND_ADDRESS_V6=::` in `.env`. MLflow has no authentication, so switch it
+back after the demo.
+
 **MLflow snapshot:** `mlflow_data/` is not committed. On first start, if `mlflow_data/` is empty, the mlflow service copies
 the committed snapshot `mlflow_seed/` into it (2026-10-20 training: 4 experiments, 30 runs, `xai-credit-scoring@production`).
 So the MLflow UI shows the experiments and the registered model right after a clone. An existing store is never touched.
@@ -250,6 +254,8 @@ Copy `.env.example` to `.env`. Model and business settings live in `configs/*.ya
 | Variable | Default | Description |
 | --- | --- | --- |
 | `API_PORT` / `DASHBOARD_PORT` / `MLFLOW_PORT` / `JUPYTER_PORT` | 8000 / 8501 / 5000 / 8888 | Host ports |
+| `BIND_ADDRESS` / `BIND_ADDRESS_V6` | `127.0.0.1` / `::1` | Addresses the API, dashboard and MLflow ports open on (IPv4 / IPv6). `0.0.0.0` / `::` also allow other devices on the same network. IPv6 is opened too because `localhost` on Windows tries `::1` first, and with IPv4 only every request waits about 2 seconds (JupyterLab is always local only) |
+| `MLFLOW_WORKERS` / `MLFLOW_SERVER_ENABLE_JOB_EXECUTION` | `1` / `false` | MLflow server workers and GenAI job execution. The MLflow 3 defaults (4 / true) use about 2.2 GB even when idle; these settings use about 350 MB |
 | `API_URL` | `http://localhost:8000` | API address the dashboard calls (`http://api:8000` inside containers) |
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow server address (`http://mlflow:5000` inside containers). The training script reads the shell variable; unset or a folder path means the local `mlruns/` |
 | `MODEL_NAME` / `MODEL_VERSION` | `xgboost` / `v1.0` | Model the API loads → `models/xgboost_v1.0.joblib` |

@@ -71,6 +71,9 @@ docker compose up --build   # docker-compose up 도 동일
 
 종료: `docker compose down`
 
+포트는 기본으로 이 PC 에서만 열린다 (IPv4 `127.0.0.1`, IPv6 `::1`). 같은 네트워크의 다른 기기에서 시연하려면 `.env` 에
+`BIND_ADDRESS=0.0.0.0` 과 `BIND_ADDRESS_V6=::` 을 넣는다. MLflow 는 인증이 없으므로 시연이 끝나면 되돌린다.
+
 **MLflow 스냅샷:** `mlflow_data/` 는 git 대상이 아니다. 그래서 mlflow 서비스는 처음 시작할 때 `mlflow_data/` 가 비어 있으면
 레포의 스냅샷 `mlflow_seed/` 를 복사한다 (2026-10-20 학습: 실험 4개, 실행 30개, `xai-credit-scoring@production`).
 clone 직후에도 MLflow UI 에서 실험과 등록 모델을 볼 수 있다. 이미 기록이 있으면 건드리지 않는다.
@@ -250,6 +253,8 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
 | `API_PORT` / `DASHBOARD_PORT` / `MLFLOW_PORT` / `JUPYTER_PORT` | 8000 / 8501 / 5000 / 8888 | 호스트 측 포트 |
+| `BIND_ADDRESS` / `BIND_ADDRESS_V6` | `127.0.0.1` / `::1` | API·대시보드·MLflow 포트를 열 주소 (IPv4 / IPv6). `0.0.0.0` / `::` 이면 같은 네트워크의 다른 기기에서도 접속. IPv6 도 여는 이유는 Windows 의 `localhost` 가 `::1` 을 먼저 시도해서, IPv4 만 열면 요청마다 약 2초 늦어지기 때문 (JupyterLab 은 항상 이 PC 에서만) |
+| `MLFLOW_WORKERS` / `MLFLOW_SERVER_ENABLE_JOB_EXECUTION` | `1` / `false` | MLflow 서버 워커 수와 GenAI 작업 실행. MLflow 3 기본값(4 / true)은 쉬고 있을 때도 약 2.2GB, 이 설정은 약 350MB |
 | `API_URL` | `http://localhost:8000` | 대시보드가 호출할 API 주소 (컨테이너에서는 `http://api:8000`) |
 | `MLFLOW_TRACKING_URI` | `http://localhost:5000` | MLflow 서버 주소 (컨테이너에서는 `http://mlflow:5000`). 학습 스크립트는 셸 환경 변수를 읽으며, 없거나 폴더 경로면 로컬 `mlruns/` |
 | `MODEL_NAME` / `MODEL_VERSION` | `xgboost` / `v1.0` | API 가 로드할 모델 → `models/xgboost_v1.0.joblib` |
