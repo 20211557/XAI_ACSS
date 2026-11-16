@@ -8,6 +8,9 @@
 #   docker compose watch                      → src/ 변경 시 api·dashboard 자동 반영
 #
 # 호스트 포트 등 설정값은 .env 로 덮어쓸 수 있다 (.env.example 참고, 없으면 기본값 사용).
+# 포트는 기본으로 이 PC 에서만 열린다 (IPv4 127.0.0.1 + IPv6 ::1). Windows 의 localhost 는 ::1 을
+# 먼저 시도하므로 IPv4 만 열면 요청마다 약 2초가 늦어진다. MLflow 는 인증이 없으므로, 같은 네트워크의
+# 다른 기기에서 시연할 때만 BIND_ADDRESS=0.0.0.0, BIND_ADDRESS_V6=:: 로 바꾼다.
 # =============================================================================
 name: xai-credit
 
@@ -33,7 +36,14 @@ services:
       args: *build-args
     image: xai-credit/mlflow:latest
     ports:
-      - "${MLFLOW_PORT:-5000}:5000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${MLFLOW_PORT:-5000}:5000"
+      - "[${BIND_ADDRESS_V6:-::1}]:${MLFLOW_PORT:-5000}:5000"
+    environment:
+      # MLflow 3 기본값(웹 워커 4개 + GenAI 작업 실행 프로세스 6개)은 쉬고 있을 때도 약 2.2GB 를 쓴다.
+      # 이 프로젝트는 작업 실행 기능을 쓰지 않고 요청도 적으므로 워커 1개, 작업 실행 끔 (약 350MB).
+      # SQLite 저장소를 여러 워커가 함께 쓸 때의 "database is locked" 위험도 줄어든다.
+      MLFLOW_WORKERS: ${MLFLOW_WORKERS:-1}
+      MLFLOW_SERVER_ENABLE_JOB_EXECUTION: ${MLFLOW_SERVER_ENABLE_JOB_EXECUTION:-false}
     volumes:
       - ./mlflow_data:/mlflow
       - ./mlflow_seed:/seed:ro   # copied into an empty ./mlflow_data on first start (see Dockerfile)
@@ -55,15 +65,15 @@ services:
       args: *build-args
     image: xai-credit/api:latest
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+      - "[${BIND_ADDRESS_V6:-::1}]:${API_PORT:-8000}:8000"
     environment:
       <<: *common-env
     volumes:
       - ./models:/app/models:ro
       - ./reports:/app/reports:ro
-    depends_on:
-      mlflow:
-        condition: service_started
+    # MLflow 에 의존하지 않는다: 모델은 models/ 파일에서, 지표는 reports/ 에서 읽는다
+    # (docker compose up api 만 실행해도 mlflow 서비스를 띄우지 않는다)
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
       interval: 10s
@@ -92,7 +102,8 @@ services:
       args: *build-args
     image: xai-credit/dashboard:latest
     ports:
-      - "${DASHBOARD_PORT:-8501}:8501"
+      - "${BIND_ADDRESS:-127.0.0.1}:${DASHBOARD_PORT:-8501}:8501"
+      - "[${BIND_ADDRESS_V6:-::1}]:${DASHBOARD_PORT:-8501}:8501"
     environment:
       APP_ENV: docker
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -130,7 +141,8 @@ services:
       args: *build-args
     image: xai-credit/dev:latest
     ports:
-      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"   # 항상 이 PC 에서만 (BIND_ADDRESS 와 무관)
+      - "[::1]:${JUPYTER_PORT:-8888}:8888"
     environment:
       <<: *common-env
       APP_ENV: dev
