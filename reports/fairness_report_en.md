@@ -15,7 +15,7 @@
 | Gender fairness (before) | DI 0.995, EO gap 0.038 | Pass |
 | Age-band fairness (before) | DI 0.832, **EO gap 0.121** | DI pass, **EO fail** |
 | Mitigation A. Cutoff per age band | Age DI 0.894, EO gap 0.039 | Pass (margin 0.061) |
-| **Mitigation B. Reweighting (adopted)** | Age DI 0.912, **EO gap 0.025** | **Pass (margin 0.075)** |
+| **Mitigation B. Reweighting (recommended, not applied to the shipped model)** | Age DI 0.912, **EO gap 0.025** | **Pass (margin 0.075)** |
 | Cost of mitigation (B) | AUC 0.9492 to 0.9458, default rate among approved 1.46% to 1.49% | Small |
 
 The API and dashboard show B as "after" (`fairness.mitigation.api_method: reweighting`). A's results are in the same JSON file.
@@ -144,8 +144,9 @@ A does not change scores, so its AUC is the same.
 
 - **A also passes** (0.039). It lowers the 20-34 cutoff to 445 and raises the 55+ cutoff to 500, which cuts the 55+ FPR from 0.269 to 0.225 and raises approvals at 20-34. It does not change scores, so AUC is the same, and it approves the most people. However, the default rate among approved held on validation (1.46% to 1.45%) but rose by 0.04 points on test (1.50%).
 - **B passes with a wide margin** (0.025). It lowers the 55+ FPR from 0.269 to 0.178 and raises approvals at 20-34, closing the gap from both sides. In exchange, approvals of young defaulters also rise (FPR 0.149 to 0.191), so the overall default rate among approved rises by 0.03 points.
-- **B is adopted:** (1) its EO gap is smaller than A's (0.025 vs. 0.039), (2) it does not use a different cutoff per age at decision time, and (3) its rise in the default rate among approved is smaller than A's (+0.03 vs. +0.04 points). The cost is AUC -0.003.
+- **B is adopted as the recommended method:** (1) its EO gap is smaller than A's (0.025 vs. 0.039), (2) it does not use a different cutoff per age at decision time, and (3) its rise in the default rate among approved is smaller than A's (+0.03 vs. +0.04 points). The cost is AUC -0.003.
 - A is kept as a comparison. It has no AUC loss, but it uses age directly in the decision, and its default-rate rule did not hold on the test set.
+- **It is not applied to the shipped model.** The API and the dashboard use the model before mitigation (`models/xgboost_v1.0.joblib`), so the "before" figures in this report are the service figures. Deploying B would require retraining, registering the model, and rebuilding the performance figures, SHAP plots and recourse paths, so it is left as a team decision.
 
 ## 6. Limitations
 
