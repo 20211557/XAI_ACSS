@@ -1,7 +1,9 @@
 """Bias mitigation for one protected attribute (default: age band), two methods.
 
 1. Threshold adjustment (post-processing): keep the shipped model, give each group its own
-   approval cutoff. Cutoffs are chosen on the validation set and reported on the test set.
+   approval cutoff. Cutoffs are chosen on validation-set scores from the shipped model's setup
+   refit on train only (the shipped model was fit on train + validation, so its validation scores
+   are in-sample), then applied once to the shipped model's test-set scores.
    Rule: among cutoff combinations that meet the Equalized Odds limit and the DI band and do not
    raise the default rate among approved applicants, take the one that approves the most people.
 2. Reweighting (pre-processing, Kamiran and Calders 2012): retrain the shipped model's setup on
@@ -186,8 +188,9 @@ def weight_table(groups, y, weights) -> dict:
     }
 
 
-def fit_reweighted(train_val: pd.DataFrame, weights: np.ndarray):
-    """Refit the shipped model's setup (algorithm, features, constraints) with sample weights."""
+def fit_shipped_setup(train_val: pd.DataFrame, weights: np.ndarray | None = None):
+    """Refit the shipped model's setup (algorithm, features, constraints), optionally with
+    sample weights."""
     from src.data.features import feature_sets
     from src.models.train import load_yaml, make_estimator, monotone_vector
 
@@ -227,10 +230,14 @@ def main() -> None:
     dec_test = score(test)
     before = evaluate(dec_test["approved"], y_test, groups_test, fair_cfg, dec_test["pd"])
 
-    # 1. Threshold adjustment: choose on validation, apply once to test
+    # 1. Threshold adjustment: choose on validation, apply once to test.
+    # The shipped model saw validation in training, so score validation with the same setup
+    # refit on train only.
     g = mcfg["cutoff_grid"]
     grid = list(range(g["min"], g["max"] + 1, g["step"]))
-    dec_val = score(val)
+    logger.info("Refitting the shipped setup on train only (%d rows) for the cutoff search",
+                len(splits["train"]))
+    dec_val = score(val, fit_shipped_setup(splits["train"]))
     search = search_cutoffs(dec_val["score"], y_val, groups_val[attr], fair_cfg, base, grid)
     val_approved = apply_cutoffs(dec_val["score"], groups_val[attr], search["cutoffs"])
     search["validation"] = {
@@ -249,7 +256,7 @@ def main() -> None:
     tv_groups = protected_groups(train_val)[attr]
     weights = reweighing_weights(tv_groups, train_val[target])
     logger.info("Retraining with reweighting on %d rows", len(train_val))
-    est = fit_reweighted(train_val, weights)
+    est = fit_shipped_setup(train_val, weights)
     dec_rw = score(test, est)
     reweighting = {
         **evaluate(dec_rw["approved"], y_test, groups_test, fair_cfg, dec_rw["pd"]),
@@ -265,7 +272,8 @@ def main() -> None:
             "di_band": fair_cfg["di_ratio_bounds"],
             "eo_limit": fair_cfg["equalized_odds_max_diff"],
             "base_cutoff": base,
-            "threshold_selection": "validation set; EO <= limit, DI in band, default rate among "
+            "threshold_selection": "validation set, scored by the shipped setup refit on train "
+            "only; EO <= limit, DI in band, default rate among "
             "approved not above the single-cutoff rate; most approvals wins",
         },
         "before": before,

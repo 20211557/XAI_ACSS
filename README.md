@@ -325,6 +325,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 | 점검 (경로, 공정성, 안정성, 민감도) | [reports/audit_report_ko.md](reports/audit_report_ko.md) |
 | 공정성 검증과 Bias Mitigation | [reports/fairness_report_ko.md](reports/fairness_report_ko.md) |
 | XAI (SHAP 전역·지역 해석, 거절 사유) | [reports/xai_report_ko.md](reports/xai_report_ko.md) |
+| DiCE 승인 경로 (기간별 비교) | [reports/recourse_report_ko.md](reports/recourse_report_ko.md) |
 | MLflow 안내 | [reports/mlflow_schema_ko.md](reports/mlflow_schema_ko.md) |
 | ANOVA 인계 | [reports/anova_handoff_ko.md](reports/anova_handoff_ko.md) |
 | ANOVA 통계 검증 결과 | [reports/anova_report_ko.md](reports/anova_report_ko.md) |
@@ -341,9 +342,8 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 - `configs/actionability.yaml` 과 Excel: DiCE 가 바꿀 수 있는 변수(`dice_vary`), 방향, 단위, 허용 범위, 난이도, 단계당 개월. `spending_consistency` 의 단위, 난이도, 기간은 멘토 검토가 필요한 팀 가정이다.
 - 경로 목표: 점수 495 (`recourse_target_score`), 승인은 475 유지. 495 를 목표로 한 경로는 재학습해도 90.8% 가 승인을 유지한다.
 - **거절 사유:** 권장 불가 변수 (SHAP 1위·2위인 `regular_payment_count`, `app_login_frequency` 와 대출·신용한도 수, 부동산 담보대출 수), 불변 변수 (연령 등), 감소 불가 변수 (과거 연체 횟수) 는 조언이 아니라 "참고(변경 불가)" 로만 표시한다 (`configs/config.yaml` 의 `explainer.reference_only_classes`). 시간 의존 경로는 기다리는 기간으로 표현한다.
-- **공정성 (해결):** 연령대 균등 기회(EO) 격차 0.121 (목표 0.10 미달) 을 가중치 재학습으로 0.025 까지 줄였다 (AUC 0.9492 → 0.9458). 연령대별 기준점 방식은 0.097 로 겨우 통과해 비교로만 남겼다. [reports/fairness_report_ko.md](reports/fairness_report_ko.md) 참고.
-- **경로 미결 과제:** 495 목표의 경로 커버리지가 12개월 87.9% (24개월 91.8%) 로 목표 90% 에 미달한다 (점검 보고서 참고).
-- DiCE 에서 소득과 부채비율을 연결해야 한다 (소득이 오르면 부채비율이 내려감).
+- **공정성 (해결):** 연령대 균등 기회(EO) 격차 0.121 (목표 0.10 미달) 을 가중치 재학습으로 0.025 까지 줄였다 (AUC 0.9492 → 0.9458). 연령대별 기준점 방식도 0.039 로 통과하지만, 결정에 나이를 직접 쓰고 test 의 승인자 부도율이 더 올라 (+0.04%p) 비교로만 남겼다. [reports/fairness_report_ko.md](reports/fairness_report_ko.md) 참고.
+- **DiCE 경로 (완료, 기간 결정은 미결):** `python -m src.explainer.recourse` 로 테스트 세트 거절자 2,941명에게 기간별 경로를 찾는다 (genetic, 변수 3개 이하, 목표 495, 소득이 오르면 부채비율을 다시 계산). 커버리지는 6개월 69.5%, 9개월 81.0%, 12개월 87.9%, 18개월 91.2%, 24개월 91.8% 로, 목표 90% 는 18개월부터 통과한다. 어느 기간이든 경로 소요 기간 중앙값은 5~6개월이다. 주 지표로 쓸 기간은 팀 결정이다. [reports/recourse_report_ko.md](reports/recourse_report_ko.md) 참고.
 - ANOVA (완료): 피처 그룹별 (η² 0.98, 통합 > 대안 > 전통) 과 알고리즘별 (통합 피처끼리 비교, 트리 모델이 LR 보다 AUC 0.002 높음) 모두 p < 0.05, Tukey HSD 수행. [reports/anova_report_ko.md](reports/anova_report_ko.md). 데이터: `reports/cv_fold_auc.csv`, [reports/anova_handoff_ko.md](reports/anova_handoff_ko.md).
 - 실제 성별 점검: `reports/german/oof_predictions.csv` ([reports/german_report_ko.md](reports/german_report_ko.md) 참고).
 - **API·대시보드 연결 지점:** 거절 사유 `src/explainer/reasons.py`, ANOVA `src/statistics/anova.py` 는 1차 구현이다 (자유롭게 수정). `/fairness` 와 `/fairness/mitigation` 은 `src/fairness` 의 결과 파일을 읽는다 (적용 후로 보여줄 방법은 `configs/config.yaml` 의 `fairness.mitigation.api_method`).

@@ -14,7 +14,7 @@
 |---|---|---|
 | Gender fairness (before) | DI 0.995, EO gap 0.038 | Pass |
 | Age-band fairness (before) | DI 0.832, **EO gap 0.121** | DI pass, **EO fail** |
-| Mitigation A. Cutoff per age band | Age DI 0.840, EO gap 0.097 | Pass (margin 0.003) |
+| Mitigation A. Cutoff per age band | Age DI 0.894, EO gap 0.039 | Pass (margin 0.061) |
 | **Mitigation B. Reweighting (adopted)** | Age DI 0.912, **EO gap 0.025** | **Pass (margin 0.075)** |
 | Cost of mitigation (B) | AUC 0.9492 to 0.9458, default rate among approved 1.46% to 1.49% | Small |
 
@@ -71,17 +71,18 @@ Both methods target the age band (`fairness.mitigation.attribute`). Gender alrea
 
 The model stays as it is; each age band gets its own approval cutoff instead of 475.
 
-- **Data use:** cutoffs are chosen on the **validation set** and applied to the test set once. Choosing them on the test set would overstate the result.
+- **Data use:** cutoffs are chosen on the **validation set** and applied once to the shipped model's test-set scores. Choosing them on the test set would overstate the result.
+- **Validation scores:** the shipped model was fit on train + validation, so its validation scores are in-sample. The cutoffs are therefore chosen on validation scores from the same setup **fit on train only**. The previous version used the shipped model's validation scores, which put the validation default rate among approved at 1.29%, below the true 1.46%.
 - **Search:** 31 candidates per age band (400 to 550, step 5). All 31 x 31 x 31 = 29,791 combinations are tried.
 - **Rules:** (1) EO gap at most 0.10, (2) DI within 0.8 to 1.25, (3) default rate among approved applicants not above the single-cutoff (475) rate, so risk does not go up.
-- **Choice:** among the combinations that meet the rules (2,065), the one that **approves the most people**. Ties go to the smaller EO gap, then to cutoffs closer to 475.
+- **Choice:** among the combinations that meet the rules (2,228), the one that **approves the most people**. Ties go to the smaller EO gap, then to cutoffs closer to 475.
 
-Chosen cutoffs: **20-34: 475 (unchanged), 35-54: 465, 55+: 490.**
+Chosen cutoffs: **20-34: 445, 35-54: 465, 55+: 500.**
 
-| Validation set | DI | TPR gap | FPR gap | Approval rate | Default rate among approved |
+| Validation set (model fit on train only) | DI | TPR gap | FPR gap | Approval rate | Default rate among approved |
 |---|---|---|---|---|---|
-| Before | 0.840 | 0.101 | 0.098 | 86.59% | 1.29% |
-| After | 0.849 | 0.092 | 0.060 | 86.69% | 1.28% |
+| Before | 0.842 | 0.102 | 0.086 | 86.64% | 1.46% |
+| After | 0.901 | 0.047 | 0.026 | 86.80% | 1.45% |
 
 ### B. Reweighting (pre-processing, Kamiran and Calders 2012)
 
@@ -106,19 +107,19 @@ Defaulters aged 55+ are rare in the data, so they get a large weight and the mod
 | | DI | TPR gap | FPR gap | EO gap | Verdict |
 |---|---|---|---|---|---|
 | Before | 0.832 | 0.096 | 0.121 | 0.121 | **EO fail** |
-| A. Cutoff per age band | 0.840 | 0.088 | 0.097 | 0.097 | Pass |
+| A. Cutoff per age band | 0.894 | 0.037 | 0.039 | 0.039 | Pass |
 | **B. Reweighting** | **0.912** | **0.021** | **0.025** | **0.025** | **Pass** |
 
 | FPR per group (approved among defaulters) | 20-34 | 35-54 | 55+ |
 |---|---|---|---|
 | Before | 0.149 | 0.175 | 0.269 |
-| A | 0.149 | 0.188 | 0.246 |
+| A | 0.186 | 0.188 | 0.225 |
 | B | 0.191 | 0.202 | 0.178 |
 
 | Approval rate per group | 20-34 | 35-54 | 55+ |
 |---|---|---|---|
 | Before | 77.4% | 83.8% | 93.0% |
-| A | 77.4% | 84.8% | 92.1% |
+| A | 81.5% | 84.8% | 91.2% |
 | B | 82.0% | 85.3% | 89.9% |
 
 **Gender (side effects):**
@@ -126,7 +127,7 @@ Defaulters aged 55+ are rare in the data, so they get a large weight and the mod
 | | DI | EO gap | Verdict |
 |---|---|---|---|
 | Before | 0.995 | 0.038 | Pass |
-| A | 0.993 | 0.041 | Pass |
+| A | 0.991 | 0.046 | Pass |
 | B | 0.992 | 0.049 | Pass |
 
 **Performance (cost):**
@@ -134,23 +135,23 @@ Defaulters aged 55+ are rare in the data, so they get a large weight and the mod
 | | AUC | Approval rate | Default rate among approved | Decisions changed |
 |---|---|---|---|---|
 | Before | 0.9492 | 86.93% | 1.46% | |
-| A | 0.9492 | 86.98% | 1.47% | 192 (0.9%) |
+| A | 0.9492 | 87.14% | 1.50% | 403 (1.8%) |
 | B | 0.9458 | 86.88% | 1.49% | 598 (2.7%) |
 
 A does not change scores, so its AUC is the same.
 
 ## 5. Reading and choice
 
-- **A only just passes.** Its test EO gap is 0.097, 0.003 under the limit. On validation the gap before mitigation was already 0.101, close to the limit, so the cutoffs moved only a little. The test set has about 350 defaulters aged 20-34, so their FPR moves by about +/- 0.02 from sample to sample. Another sample could fail. The default rate among approved held on validation but rose by 0.01 points on test.
+- **A also passes** (0.039). It lowers the 20-34 cutoff to 445 and raises the 55+ cutoff to 500, which cuts the 55+ FPR from 0.269 to 0.225 and raises approvals at 20-34. It does not change scores, so AUC is the same, and it approves the most people. However, the default rate among approved held on validation (1.46% to 1.45%) but rose by 0.04 points on test (1.50%).
 - **B passes with a wide margin** (0.025). It lowers the 55+ FPR from 0.269 to 0.178 and raises approvals at 20-34, closing the gap from both sides. In exchange, approvals of young defaulters also rise (FPR 0.149 to 0.191), so the overall default rate among approved rises by 0.03 points.
-- **B is adopted:** (1) it meets the limit with a wide margin, (2) it does not use a different cutoff per age at decision time, and (3) the cost is small (AUC -0.003, default rate among approved +0.03 points).
-- A is kept as a comparison. "Age-specific cutoffs have a small and fragile effect" is a finding in itself.
+- **B is adopted:** (1) its EO gap is smaller than A's (0.025 vs. 0.039), (2) it does not use a different cutoff per age at decision time, and (3) its rise in the default rate among approved is smaller than A's (+0.03 vs. +0.04 points). The cost is AUC -0.003.
+- A is kept as a comparison. It has no AUC loss, but it uses age directly in the decision, and its default-rate rule did not hold on the test set.
 
 ## 6. Limitations
 
 - **Gender is simulated** and independent of default, so passing on gender is expected. For a real-gender check see the German Credit secondary model (`reports/german_report_en.md`).
 - **Age is a model feature** (no monotone constraint, protected attribute). B does not remove age; it only weakens the age-default link through the training weights.
 - **A uses age directly in the decision.** Real lenders may face legal and ethical limits on this.
-- **No confidence intervals.** Each EO gap is one test-set value. With about 350 defaulters aged 20-34, A's 0.097 in particular is statistically indistinguishable from 0.10.
+- **No confidence intervals.** Each EO gap is one test-set value. With only about 350 defaulters aged 20-34, their FPR moves by about +/- 0.02 from sample to sample.
 - When the training sample changes, 26.8% of decisions near the cutoff (+/- 30 points) flip (`reports/audit_report_en.md`, section 3). B is also a retrained model, so individual decisions near the cutoff are as unstable as the shipped model's. Read these as group-level figures.
 - The simulator uses the target for every row (as in the mission example), so AUC and other performance figures are optimistic.
