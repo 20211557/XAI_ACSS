@@ -52,7 +52,7 @@ def source_caption(is_dummy: bool, source: str | None = None, note: str | None =
     if is_dummy:
         st.caption(f"🟡 **더미 데이터** · {note or '실제 값을 계산할 수 없어 넣은 예시 값'}")
     else:
-        st.caption(f"✅ 실제 데이터 · {source or ''}" + (f" · {note}" if note else ""))
+        st.caption(" · ".join(p for p in ("✅ 실제 데이터", source, note) if p))
 
 
 def risk_badge(grade: str) -> str:
@@ -382,8 +382,14 @@ def tab_fairness() -> None:
     source_caption(fair["is_dummy"], fair["source"], fair["note"])
 
     st.divider()
-    st.subheader("Bias Mitigation 전/후 비교")
+    st.subheader("Bias Mitigation 전/후 비교 (배포 모델 미적용)")
     mit = fetch("mitigation")
+    served = fetch("health")["model_version"]
+    st.info(
+        f"'적용 후'는 완화 방법을 적용했다면 나왔을 test 세트 결과입니다. 현재 배포 모델 "
+        f"`{served}` 에는 적용하지 않았습니다. 위 공정성 지표와 고객 심사, 모델 성능 탭은 "
+        "모두 배포 모델 기준입니다."
+    )
     names = [ATTRIBUTES[a] for a in mit["before"]]
     left, right = st.columns(2)
     for column, metric, title, line in (
@@ -398,8 +404,8 @@ def tab_fairness() -> None:
         fig = go.Figure()
         for (side, label), color in zip(
             (
-                ("before", "적용 전"),
-                ("after", "적용 후 (더미)" if mit["after_is_dummy"] else "적용 후"),
+                ("before", "적용 전 (배포 모델)"),
+                ("after", "적용 후 (더미)" if mit["after_is_dummy"] else "적용 후 (미적용)"),
             ),
             SERIES,
             strict=True,
@@ -411,8 +417,10 @@ def tab_fairness() -> None:
         fig.update_layout(title=title, barmode="group")
         with column:
             chart(fig, height=320)
-    source_caption(False, mit["source"], "적용 전")
-    source_caption(mit["after_is_dummy"], note=f"적용 후 ({mit['method']}): {mit['note']}")
+    source_caption(False, mit["source"], f"적용 전 = 배포 모델 {served}")
+    source_caption(
+        mit["after_is_dummy"], note=f"적용 후 ({mit['method']}, 배포 모델 미적용): {mit['note']}"
+    )
 
 
 # ---------------------------------------------------------------------------
