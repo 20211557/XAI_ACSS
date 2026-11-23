@@ -1,0 +1,151 @@
+{
+  "target_score": 495,
+  "max_changed_features": 3,
+  "link_income_debt": true,
+  "dice": {
+    "method": "genetic",
+    "total_cfs": 5,
+    "maxiterations": 500,
+    "proximity_weight": 0.2,
+    "sparsity_weight": 0.2,
+    "diversity_weight": 5.0
+  },
+  "varied_features": [
+    "RevolvingUtilizationOfUnsecuredLines",
+    "DebtRatio",
+    "MonthlyIncome",
+    "telecom_payment_rate",
+    "utility_payment_rate",
+    "telecom_tenure_months",
+    "insurance_paid_months",
+    "spending_consistency"
+  ],
+  "horizons": {
+    "6": {
+      "rejected": 2941,
+      "corner_bound": 0.6964,
+      "corner_bound_thin": 0.6637,
+      "dice_coverage": 0.6953,
+      "dice_coverage_thin": 0.6614,
+      "dice_coverage_not_thin": 0.7014,
+      "dice_share_of_corner": 0.9985,
+      "vars_needed": {
+        "1": 1033,
+        "2": 686,
+        "3": 326
+      },
+      "median_months": 5.0,
+      "top_paths": {
+        "insurance_paid_months": 715,
+        "insurance_paid_months + spending_consistency": 316,
+        "spending_consistency": 277,
+        "utility_payment_rate + insurance_paid_months": 142,
+        "utility_payment_rate + insurance_paid_months + spending_consistency": 119
+      },
+      "not_feasible_even_all_vars": 639,
+      "seconds_per_applicant_median": 0.436,
+      "wall_seconds": 68.0
+    },
+    "9": {
+      "rejected": 2941,
+      "corner_bound": 0.8103,
+      "corner_bound_thin": 0.8049,
+      "dice_coverage": 0.8096,
+      "dice_coverage_thin": 0.8049,
+      "dice_coverage_not_thin": 0.8104,
+      "dice_share_of_corner": 0.9992,
+      "vars_needed": {
+        "1": 1294,
+        "2": 834,
+        "3": 253
+      },
+      "median_months": 6.0,
+      "top_paths": {
+        "insurance_paid_months": 766,
+        "spending_consistency": 481,
+        "insurance_paid_months + spending_consistency": 430,
+        "utility_payment_rate + insurance_paid_months": 138,
+        "utility_payment_rate + insurance_paid_months + spending_consistency": 131
+      },
+      "not_feasible_even_all_vars": 263,
+      "seconds_per_applicant_median": 0.439,
+      "wall_seconds": 74.5
+    },
+    "12": {
+      "rejected": 2941,
+      "corner_bound": 0.8786,
+      "corner_bound_thin": 0.87,
+      "dice_coverage": 0.8786,
+      "dice_coverage_thin": 0.87,
+      "dice_coverage_not_thin": 0.8802,
+      "dice_share_of_corner": 1.0,
+      "vars_needed": {
+        "1": 1477,
+        "2": 872,
+        "3": 235
+      },
+      "median_months": 6.0,
+      "top_paths": {
+        "insurance_paid_months": 771,
+        "spending_consistency": 653,
+        "insurance_paid_months + spending_consistency": 487,
+        "utility_payment_rate + insurance_paid_months + spending_consistency": 122,
+        "utility_payment_rate + insurance_paid_months": 113
+      },
+      "not_feasible_even_all_vars": 117,
+      "seconds_per_applicant_median": 0.445,
+      "wall_seconds": 79.0
+    },
+    "18": {
+      "rejected": 2941,
+      "corner_bound": 0.9119,
+      "corner_bound_thin": 0.9103,
+      "dice_coverage": 0.9119,
+      "dice_coverage_thin": 0.9103,
+      "dice_coverage_not_thin": 0.9122,
+      "dice_share_of_corner": 1.0,
+      "vars_needed": {
+        "1": 1539,
+        "2": 883,
+        "3": 260
+      },
+      "median_months": 6.0,
+      "top_paths": {
+        "insurance_paid_months": 765,
+        "spending_consistency": 721,
+        "insurance_paid_months + spending_consistency": 492,
+        "utility_payment_rate + insurance_paid_months + spending_consistency": 113,
+        "utility_payment_rate + insurance_paid_months": 99
+      },
+      "not_feasible_even_all_vars": 21,
+      "seconds_per_applicant_median": 0.466,
+      "wall_seconds": 88.1
+    },
+    "24": {
+      "rejected": 2941,
+      "corner_bound": 0.9184,
+      "corner_bound_thin": 0.917,
+      "dice_coverage": 0.9181,
+      "dice_coverage_thin": 0.917,
+      "dice_coverage_not_thin": 0.9182,
+      "dice_share_of_corner": 0.9996,
+      "vars_needed": {
+        "1": 1551,
+        "2": 876,
+        "3": 273
+      },
+      "median_months": 6.0,
+      "top_paths": {
+        "insurance_paid_months": 768,
+        "spending_consistency": 721,
+        "insurance_paid_months + spending_consistency": 485,
+        "utility_payment_rate + insurance_paid_months + spending_consistency": 106,
+        "utility_payment_rate + insurance_paid_months": 90
+      },
+      "not_feasible_even_all_vars": 11,
+      "seconds_per_applicant_median": 0.472,
+      "wall_seconds": 90.7
+    }
+  },
+  "wall_seconds": 400.4
+}

@@ -66,6 +66,27 @@ explainer:
     spending_consistency: {kind: decimal, unit: 점}
     regular_payment_count: {kind: count, unit: 건}
     app_login_frequency: {kind: count, unit: 회}
+  # DiCE 승인 경로 (python -m src.explainer.recourse). 바꿀 변수, 방향, 단위, 범위, 단계당 개월, 난이도는
+  # configs/actionability.yaml (dice_vary: true), 목표 점수는 configs/scoring.yaml (recourse_target_score)
+  recourse:
+    horizons_months: [6, 9, 12, 18, 24]
+    max_changed_features: 3
+    # DebtRatio = 월 부채 상환액 / 월 소득. 소득이 오르면 부채가 그대로라는 가정으로 DebtRatio 를 다시 계산
+    link_income_debt: true
+    dice:
+      method: genetic
+      total_cfs: 5
+      maxiterations: 500
+      proximity_weight: 0.2
+      sparsity_weight: 0.2
+      diversity_weight: 5.0
+    # 유전 알고리즘 초기 집단: 한 번에 init_batch 개씩, 최대 init_max_samples 개까지 무작위로 뽑는다
+    init_batch: 2000
+    init_max_samples: 100000
+    seed: 42
+    n_jobs: -1          # -1 = CPU 코어 수
+    output_dir: recourse                     # reports/ 아래
+    mlflow_experiment: nextstep-recourse
 
 fairness:
   protected_attributes:

@@ -29,6 +29,7 @@ skops==0.16.0                # MLflow 3 의 sklearn 모델 저장 형식 (src/mo
 shap==0.53.0
 fairlearn==0.15.0
 statsmodels==0.15.0
+dice-ml==0.12                # Actionable Recourse 반사실 경로 (src/explainer/recourse.py)
 
 # ----- 실험 추적 (MLflow 3: Model Registry 는 stage 대신 alias/tag 권장) -----
 mlflow==3.16.1
