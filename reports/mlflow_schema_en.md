@@ -10,6 +10,7 @@
 - **Inside docker-compose:** set `MLFLOW_TRACKING_URI` to the compose MLflow server and **rerun training** (`python -m src.models.train --stage all`, about 15 to 25 minutes, seeded). Do not copy the local `mlruns/` folder into a container: its database stores **absolute** artifact paths from the machine where it was created, so the artifacts would not be found.
 - **Snapshot of the compose server:** the server store `mlflow_data/` is gitignored, but a snapshot with the same content is committed as `mlflow_seed/`. On first start the server copies it in when its store is empty (README, How to run, step 1). The server store keeps artifact paths relative to the server (`mlflow-artifacts:/...`), so it works on any machine. That is the difference from a local `mlruns/`.
 - `mlruns/` is gitignored. Browse it locally with `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`.
+- **Viewing the UI:** the MLflow 3.16 UI first opens in GenAI mode (traces view), so experiments look empty. Click **Model training** at the top left once and the browser remembers it. This default is a browser setting (`mlflow.workflowType` in `localStorage`), so neither the server nor experiment tags can change it. Adding `?workflowType=machine_learning` to a runs page address opens the training view directly (e.g. `http://localhost:5000/#/experiments/3/runs?workflowType=machine_learning`).
 
 ## Experiments and runs
 
@@ -54,8 +55,9 @@ The run id changes on every retraining, so load the registered model by its alia
 
 - **Register:** after training, run `python -m src.models.registry` (dev container: `docker compose --profile dev run --rm dev python -m src.models.registry`). It registers the model of the latest run tagged `stage=final` in experiment `nextstep-final` as a new version of the registered model `xai-credit-scoring`. Registering the same run again reuses its version.
 - **Alias:** stages (Production / Staging) are deprecated in MLflow 3, so an alias marks the version: `production` when the run meets every charter target, `staging` when it misses one. A `staging` version leaves the current `production` version in place.
+- **Stage tag:** to match the mission wording ("Production or Staging tag"), the version also gets the tag `stage`: `Production` for alias `production`, `Staging` for `staging`. When an alias moves to a newer version, the old version becomes `Archived` (`mlflow.registry.stage_tag` in `configs/train.yaml`).
 - **Charter targets:** `test_auc` ≥ 0.78, `test_ks` ≥ 0.28, `test_thin_auc_lift` ≥ 0.03, `test_psi_trainval_vs_test` < 0.1 (`performance_targets` in `configs/config.yaml`), `mono_auc_loss` ≤ 0.01 (`monotonic.max_auc_loss` in `configs/train.yaml`). The last one does not apply to a model without monotonic constraints.
-- **Version tags:** `run_name`, `model_version`, `model_file`, `data_md5`, `test_auc`, `test_ks`, `charter_pass`, `charter_failed`.
+- **Version tags:** `run_name`, `model_version`, `model_file`, `data_md5`, `test_auc`, `test_ks`, `charter_pass`, `charter_failed`, `stage`.
 - The registered model name and aliases are in `mlflow.registry` of `configs/train.yaml`. The API loads `models/xgboost_v1.0.joblib`, not the registry.
 
 ## Input columns (21, this order, all numeric; NaN allowed)

@@ -78,6 +78,16 @@ back after the demo.
 the committed snapshot `mlflow_seed/` into it (2026-10-20 training: 4 experiments, 30 runs, `xai-credit-scoring@production`).
 So the MLflow UI shows the experiments and the registered model right after a clone. An existing store is never touched.
 
+**Viewing the MLflow UI:** the MLflow 3.16 UI first opens in GenAI mode (traces view), so experiments look empty. Click
+**Model training** at the top left once; the browser remembers it, and experiments then open on their training runs. This
+default is a browser setting, so the server cannot change it. Direct links to the training runs (experiment numbers of the
+snapshot):
+[nextstep-lr](http://localhost:5000/#/experiments/1/runs?workflowType=machine_learning) ·
+[nextstep-lgbm](http://localhost:5000/#/experiments/2/runs?workflowType=machine_learning) ·
+[nextstep-xgb](http://localhost:5000/#/experiments/3/runs?workflowType=machine_learning) ·
+[nextstep-final](http://localhost:5000/#/experiments/4/runs?workflowType=machine_learning) ·
+[registered model](http://localhost:5000/#/models/xai-credit-scoring)
+
 ### 2. Data pipeline and training (dev container)
 
 Run in order (fully seeded). The dev container has `MLFLOW_TRACKING_URI=http://mlflow:5000`, so every run shows up in the MLflow UI (experiments `nextstep-lr`, `nextstep-lgbm`, `nextstep-xgb`, `nextstep-final`, `nextstep-audit`).
@@ -92,7 +102,7 @@ docker compose --profile dev run --rm dev python -m src.data.simulator
 # Model comparison → monotonic constraints → final model (about 15 to 25 minutes): models/xgboost_v1.0.joblib, reports/*.csv, final_summary.json
 docker compose --profile dev run --rm dev python -m src.models.train --stage all
 
-# Register the final model in the Model Registry: xai-credit-scoring, alias production (staging if a charter target is missed)
+# Register the final model in the Model Registry: xai-credit-scoring, alias production + tag stage=Production (staging / Staging if a charter target is missed)
 docker compose --profile dev run --rm dev python -m src.models.registry
 ```
 
@@ -351,7 +361,7 @@ Every report also has a Korean version (`_ko`). The final experiment report (PDF
 
 **윤제진 (MLflow, Docker, FastAPI, Streamlit)**
 - [reports/mlflow_schema_en.md](reports/mlflow_schema_en.md): experiments (one per algorithm, plus final and audit), metric keys, the 21 input columns, how to load the model. Every model artifact has a signature and input example; the served model returns probabilities (column 1 = PD).
-- **Model Registry:** `python -m src.models.registry` registers the latest `stage=final` run of experiment `nextstep-final` as `xai-credit-scoring`. Stages are deprecated in MLflow 3, so an alias marks the version: `production` when the run meets every charter target (AUC, KS, thin-filer lift, PSI, monotonic loss), `staging` when it misses one; a `staging` version leaves the current `production` version in place. Registering the same run again creates no new version. Settings: `mlflow.registry` in `configs/train.yaml`. Load with `mlflow.pyfunc.load_model("models:/xai-credit-scoring@production")`.
+- **Model Registry:** `python -m src.models.registry` registers the latest `stage=final` run of experiment `nextstep-final` as `xai-credit-scoring`. Stages are deprecated in MLflow 3, so an alias marks the version: `production` when the run meets every charter target (AUC, KS, thin-filer lift, PSI, monotonic loss), `staging` when it misses one; a `staging` version leaves the current `production` version in place. To match the mission wording ("Production or Staging tag"), the version also gets a `stage` tag (`Production` / `Staging`), and when an alias moves to a newer version the old one becomes `Archived`. Registering the same run again creates no new version. Settings: `mlflow.registry` in `configs/train.yaml`. Load with `mlflow.pyfunc.load_model("models:/xai-credit-scoring@production")`.
 - To get the runs and the registered model into the MLflow server, rerun training and the register command in the dev container (How to run, step 2).
 - The API loads `models/xgboost_v1.0.joblib` from `MODEL_NAME` / `MODEL_VERSION` (version in `configs/train.yaml`; also in `reports/final_summary.json` for `/health`). Use `src/models/scoring.py` for PD to score, grade and approval.
 

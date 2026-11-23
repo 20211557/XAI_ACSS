@@ -49,6 +49,17 @@ def test_seed_registry_points_at_the_shipped_final_run(db):
     assert (artifact_dir(storage) / "MLmodel").exists()
 
 
+def test_seed_production_version_has_the_stage_tag(db):
+    """Mission wording: the final model is registered with a Production (or Staging) tag."""
+    reg, stage = MLFLOW["registry"], MLFLOW["registry"]["stage_tag"]
+    row = db.execute(
+        "select t.value from registered_model_aliases a join model_version_tags t "
+        "on t.name = a.name and t.version = a.version "
+        "where a.name = ? and a.alias = ? and t.key = ?",
+        (reg["model_name"], reg["alias"], stage["key"])).fetchone()
+    assert row == (stage["production"],), "refresh mlflow_seed/ after python -m src.models.registry"
+
+
 def test_seed_artifacts_are_portable_and_present(db):
     uris = [u for (u,) in db.execute("select artifact_location from experiments")]
     uris += [u for (u,) in db.execute(f"select artifact_uri from runs where {ACTIVE}")]

@@ -10,6 +10,7 @@
 - **docker-compose 안에서는:** `MLFLOW_TRACKING_URI`를 compose의 MLflow 서버로 설정하고 **학습을 다시 실행**하십시오 (`python -m src.models.train --stage all`, 약 15~25분, 시드 고정). 로컬 `mlruns/` 폴더를 컨테이너로 복사하지 마십시오. 그 데이터베이스는 만들어진 컴퓨터의 **절대** 아티팩트 경로를 저장하므로 아티팩트를 찾을 수 없습니다.
 - **compose 서버의 스냅샷:** 서버 저장소 `mlflow_data/`는 git에서 제외되지만, 같은 내용의 스냅샷 `mlflow_seed/`를 커밋해 두었습니다. 서버는 처음 시작할 때 저장소가 비어 있으면 이 스냅샷을 복사합니다 (README 실행 방법 1). 서버 저장소의 아티팩트 경로는 서버 기준 상대 경로(`mlflow-artifacts:/...`)라 다른 컴퓨터에서도 그대로 동작합니다. 이 점이 로컬 `mlruns/`와 다릅니다.
 - `mlruns/`는 git에서 제외됩니다. 로컬에서 보기: `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`.
+- **UI 보는 법:** MLflow 3.16 UI는 처음 열면 GenAI 모드(트레이스 화면)라 실험이 비어 보입니다. 왼쪽 위에서 **Model training**을 한 번 누르면 브라우저가 기억합니다. 이 기본값은 브라우저 설정(`localStorage`의 `mlflow.workflowType`)이라 서버나 실험 태그로 바꿀 수 없습니다. 실행 목록 주소에 `?workflowType=machine_learning`을 붙이면 바로 학습 화면이 열립니다 (예: `http://localhost:5000/#/experiments/3/runs?workflowType=machine_learning`).
 
 ## 실험과 실행
 
@@ -54,8 +55,9 @@ pd_ = model.predict(example)[:, 1]                            # 부도 확률
 
 - **등록:** 학습 후 `python -m src.models.registry`를 실행합니다 (dev 컨테이너: `docker compose --profile dev run --rm dev python -m src.models.registry`). 실험 `nextstep-final`에서 태그 `stage=final`인 최신 실행의 모델을 등록 모델 `xai-credit-scoring`의 새 버전으로 등록합니다. 같은 실행을 다시 등록하면 기존 버전을 그대로 씁니다.
 - **alias:** MLflow 3에서 stage (Production / Staging)는 deprecated 이므로 alias를 씁니다. 헌장 목표를 모두 충족하면 `production`, 하나라도 미달이면 `staging`입니다. `staging`으로 등록해도 기존 `production` 버전은 바뀌지 않습니다.
+- **stage 태그:** 과제 문구("Production 또는 Staging 태그")에 맞춰 버전 태그 `stage`도 붙입니다. alias `production`이면 `Production`, `staging`이면 `Staging`이고, alias가 새 버전으로 옮겨 가면 이전 버전은 `Archived`가 됩니다 (`configs/train.yaml`의 `mlflow.registry.stage_tag`).
 - **헌장 목표:** `test_auc` ≥ 0.78, `test_ks` ≥ 0.28, `test_thin_auc_lift` ≥ 0.03, `test_psi_trainval_vs_test` < 0.1 (`configs/config.yaml`의 `performance_targets`), `mono_auc_loss` ≤ 0.01 (`configs/train.yaml`의 `monotonic.max_auc_loss`). 단조 제약이 없는 모델에는 마지막 항목을 적용하지 않습니다.
-- **버전 태그:** `run_name`, `model_version`, `model_file`, `data_md5`, `test_auc`, `test_ks`, `charter_pass`, `charter_failed`.
+- **버전 태그:** `run_name`, `model_version`, `model_file`, `data_md5`, `test_auc`, `test_ks`, `charter_pass`, `charter_failed`, `stage`.
 - 등록 모델 이름과 alias는 `configs/train.yaml`의 `mlflow.registry`에 있습니다. API는 레지스트리가 아니라 `models/xgboost_v1.0.joblib`을 불러옵니다.
 
 ## 입력 열 (21개, 이 순서, 모두 숫자, NaN 허용)
