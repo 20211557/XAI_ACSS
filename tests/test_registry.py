@@ -22,6 +22,7 @@ SHARED = load_yaml("config.yaml")
 TARGETS = SHARED["performance_targets"]
 MAX_LOSS = CFG["monotonic"]["max_auc_loss"]
 REG = CFG["mlflow"]["registry"]
+STAGE = REG["stage_tag"]
 # Metrics of a final run that meets every charter target
 GOOD = {"test_auc": 0.95, "test_ks": 0.76, "test_thin_auc_lift": 0.07,
         "test_psi_trainval_vs_test": 0.001, "mono_auc_loss": 0.002}
@@ -103,6 +104,7 @@ def test_register_production_and_rerun_reuses_version(store, cfg, model):
     assert (mv.version, mv.run_id) == (1, run_id)
     assert mv.tags["model_version"] == CFG["model_version"] and mv.tags["test_auc"] == "0.9500"
     assert (mv.tags["charter_pass"], mv.tags["charter_failed"]) == ("true", "none")
+    assert mv.tags[STAGE["key"]] == STAGE["production"] == "Production"   # mission wording
     assert SHARED["project"]["disclaimer"] in MlflowClient().get_registered_model(name).description
 
 
@@ -113,6 +115,11 @@ def test_newer_final_run_moves_alias(store, cfg, model):
     result = register_final(cfg, SHARED)
     assert (result["version"], result["run_id"]) == (2, newer)
     assert by_alias(cfg, REG["alias"]).version == 2
+    # the stage tag follows the alias: the replaced version is archived
+    name = cfg["mlflow"]["registry"]["model_name"]
+    old, new = (MlflowClient().get_model_version(name, v) for v in (1, 2))
+    assert (old.tags[STAGE["key"]], new.tags[STAGE["key"]]) == (STAGE["archived"],
+                                                                 STAGE["production"])
 
 
 def test_failing_run_goes_to_staging_and_keeps_production(store, cfg, model):
@@ -121,9 +128,10 @@ def test_failing_run_goes_to_staging_and_keeps_production(store, cfg, model):
     log_final_run(store, cfg, model, {**GOOD, "test_auc": TARGETS["auc_roc_min"] - 0.01})
     result = register_final(cfg, SHARED)
     assert (result["version"], result["alias"]) == (2, REG["fallback_alias"])
-    assert by_alias(cfg, REG["alias"]).version == 1
+    production = by_alias(cfg, REG["alias"])
+    assert production.version == 1 and production.tags[STAGE["key"]] == STAGE["production"]
     staging = by_alias(cfg, REG["fallback_alias"])
-    assert staging.version == 2
+    assert staging.version == 2 and staging.tags[STAGE["key"]] == STAGE["staging"] == "Staging"
     assert (staging.tags["charter_pass"], staging.tags["charter_failed"]) == ("false", "test_auc")
 
 

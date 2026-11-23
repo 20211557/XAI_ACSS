@@ -10,6 +10,9 @@ the version instead: `production` when the run meets every charter target (confi
 performance_targets, monotonic.max_auc_loss), `staging` otherwise. A staging version leaves the
 current production version in place. Registering the same run again reuses its version.
 
+The version also gets a `stage` tag (Production / Staging) that matches the mission wording; when
+an alias moves to a newer version, the old version's tag becomes Archived.
+
 Load the registered model (pyfunc returns probabilities, column 1 = PD):
   mlflow.pyfunc.load_model("models:/xai-credit-scoring@production")
 """
@@ -21,6 +24,7 @@ import operator
 import mlflow
 from mlflow import MlflowClient
 from mlflow.entities import Run
+from mlflow.exceptions import MlflowException
 
 from src.config import load_config
 from src.models import evaluate as ev
@@ -109,13 +113,22 @@ def register_final(cfg: dict, shared: dict, client: MlflowClient | None = None) 
         "charter_pass": str(not failed).lower(),
         "charter_failed": ",".join(failed) or "none",
     }
+    stage = reg["stage_tag"]
+    tags[stage["key"]] = stage[alias]
     for key, value in tags.items():
         if value:
             client.set_model_version_tag(name, version, key, value)
+    try:
+        previous = client.get_model_version_by_alias(name, alias)
+    except MlflowException:   # the alias is not set yet
+        previous = None
+    if previous is not None and str(previous.version) != str(version):
+        client.set_model_version_tag(name, previous.version, stage["key"], stage["archived"])
     client.set_registered_model_alias(name, alias, version)
     return {"model_name": name, "version": int(version), "alias": alias,
-            "uri": f"models:/{name}@{alias}", "new_version": not existing,
-            "run_id": run_id, "run_name": run.info.run_name, "charter": charter}
+            "stage_tag": stage[alias], "uri": f"models:/{name}@{alias}",
+            "new_version": not existing, "run_id": run_id, "run_name": run.info.run_name,
+            "charter": charter}
 
 
 def main() -> None:

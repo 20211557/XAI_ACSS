@@ -51,6 +51,9 @@ mlflow:
     model_name: xai-credit-scoring
     alias: production                   # the final run meets every charter target
     fallback_alias: staging             # it misses at least one target
+    # Version tag matching the mission wording ("Production or Staging tag"), kept in step with
+    # the alias: the version that loses an alias to a newer one is tagged archived.
+    stage_tag: {key: stage, production: Production, staging: Staging, archived: Archived}
 outputs:
   comparison: reports/model_comparison.csv
   cv_fold_auc: reports/cv_fold_auc.csv   # ANOVA handoff: run, model, features, resampling, repeat, fold, segment, n_rows, n_defaults, auc
