@@ -1,4 +1,6 @@
-"""심사역용 Streamlit 대시보드 (5개 탭: 고객 심사, XAI 분석, 공정성, 모델 성능, 통계 검증).
+"""심사역용 Streamlit 대시보드.
+
+6개 탭: 고객 심사 (+ DiCE 승인 경로), XAI 분석, 승인 경로, 공정성, 모델 성능, 통계 검증.
 
 실행: streamlit run src/dashboard/app.py
 (PYTHONPATH 에 프로젝트 루트가 있어야 한다. Docker 이미지는 자동 설정)
@@ -183,9 +185,18 @@ def tab_review() -> None:
     if submitted:
         payload = {f["feature"]: st.session_state[f"in_{f['feature']}"] for f in feats}
         payload["customer_id"] = st.session_state["in_customer_id"] or None
+        st.session_state.pop("recourse", None)  # 이전 고객의 경로는 지운다
         try:
             st.session_state["result"] = client.predict(payload)
             st.session_state["explanation"] = client.explain(payload)
+            st.session_state["payload"] = payload
+            if st.session_state["result"]["approval_status"] == "REJECTED":
+                with st.spinner("DiCE 로 승인 경로를 찾는 중..."):
+                    st.session_state["recourse"] = client.recourse(
+                        payload,
+                        RECOURSE_HORIZON,
+                        timeout=config["dashboard"]["recourse_timeout_seconds"],
+                    )
         except ApiError as exc:
             st.error(str(exc))
 
@@ -214,6 +225,81 @@ def tab_review() -> None:
         st.markdown("**주요 위험 요인** (자세한 내용은 XAI 분석 탭)")
         for r in explanation["rejection_reasons"][:3]:
             st.markdown(f"- {r['explanation']}")
+    if not approved and st.session_state.get("recourse"):
+        recourse_section(st.session_state["recourse"])
+
+
+# ---------------------------------------------------------------------------
+# 1-1. DiCE 승인 경로 (고객 심사 탭, 거절 고객). 기간은 api.recourse_default_horizon 으로 고정
+# ---------------------------------------------------------------------------
+RECOURSE = config["explainer"]["recourse"]
+RECOURSE_HORIZON = config["api"]["recourse_default_horizon"]
+
+
+def recourse_section(rec: dict) -> None:
+    st.divider()
+    st.subheader(f"승인 경로 ({rec['horizon_months']}개월)")
+    st.caption(
+        f"바꿀 수 있는 항목 {rec['max_changed_features']}가지 이하를 {rec['horizon_months']}개월 "
+        f"안에 바꿔 {rec['target_score']}점에 닿는 가장 쉬운 방법입니다 (DiCE)."
+    )
+    if rec["status"] != "found":
+        st.warning(rec["note"])
+        return
+    path = rec["path"]
+    prob = path["approval_probability"]
+    m1, m2 = st.columns(2)
+    m3, m4 = st.columns(2)
+    m1.metric(
+        "바뀐 뒤 점수",
+        path["score_after"],
+        f"{path['score_after'] - rec['credit_score']:+d}점",
+        border=True,
+        help=f"목표 {rec['target_score']}점, 승인 기준 {rec['approval_cutoff']}점",
+    )
+    m2.metric(
+        "승인 가능성",
+        "-" if prob is None else f"약 {prob * 100:.0f}%",
+        border=True,
+        help=f"평가 모델을 조금씩 다른 데이터로 {path['approval_models']}번 다시 만들었을 때 "
+        "이 점수의 경로를 승인한 비율",
+    )
+    m3.metric("걸리는 기간", f"약 {path['months']:g}개월", border=True)
+    m4.metric("바꿀 항목", f"{len(path['changes'])}가지", border=True)
+    chance = "" if prob is None else f" 이 경로의 승인 가능성은 약 {prob * 100:.0f}% 입니다."
+    st.warning(
+        f"**이 경로를 따라도 승인이 보장되지는 않습니다.**{chance}\n\n"
+        "- 평가 모델은 새 자료로 다시 만들어지므로, 같은 경로라도 결과가 달라질 수 있습니다.\n"
+        "- 그동안 다른 항목이 나빠지면 (새 연체, 소득 감소 등) 점수가 내려갑니다.\n"
+        "- 승인 기준이나 심사 정책이 바뀔 수 있습니다."
+    )
+    single = len(path["changes"]) == 1
+    rows = []
+    for c in path["changes"]:
+        row = {
+            "항목": short(c["feature_name_kr"]),
+            "지금": c["current_text"],
+            "바뀐 뒤": c["proposed_text"],
+            "기간": f"약 {c['months']:g}개월",
+            "이것만 바뀌면": f"{c['score_if_only_this']}점",
+        }
+        if not single:
+            row["이것이 빠지면"] = f"{c['score_without_this']}점"
+        rows.append(row)
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+
+    st.markdown("**왜 이 경로인가요?**")
+    st.markdown(path["summary"])
+    for c in path["changes"]:
+        st.markdown(f"- {c['why']}")
+    if path["linked_debt_ratio"] is not None:
+        st.caption(
+            "소득이 늘어도 갚는 돈은 그대로라고 보고, 부채비율을 "
+            f"{path['linked_debt_ratio'] * 100:.0f}% 로 다시 계산했습니다."
+        )
+    st.caption(
+        f"계산 {rec['elapsed_seconds']:.2f}초 · ✅ 실제 데이터 (배포 모델 {rec['model_version']})"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -309,6 +395,152 @@ def tab_xai() -> None:
         )
     if not exp["rejection_reasons"]:
         st.success("부도 위험을 눈에 띄게 높인 변수가 없습니다.")
+
+
+# ---------------------------------------------------------------------------
+# 2-1. 승인 경로 (test 세트 거절자 전체, 미리 계산)
+# ---------------------------------------------------------------------------
+def tab_recourse() -> None:
+    s = fetch("recourse_summary")
+    rows = s["horizons"]
+    st.markdown(
+        f"배포 모델이 test 세트에서 거절한 신청자 **{rows[0]['rejected']:,}명** 에게 DiCE 로 "
+        f"경로를 찾았습니다. 경로 = 바꿀 수 있는 변수 {s['max_changed_features']}개 이하를 기간 "
+        f"안에 바꿔 {s['target_score']}점에 닿는 방법. 개별 고객의 경로는 고객 심사 탭에서 찾을 수 "
+        "있습니다."
+    )
+    if s["model_match"] is False:
+        st.warning("거절자 수가 지금 배포 모델과 다릅니다. 경로를 다시 계산해야 합니다.")
+
+    horizons = [r["horizon_months"] for r in rows]
+    pick = s["default_horizon"] if s["default_horizon"] in horizons else horizons[-1]
+    r = rows[horizons.index(pick)]
+    st.markdown(f"**적용 기간: {pick}개월** (고객 심사 탭의 경로도 이 기간으로 찾습니다)")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric(
+        "경로 커버리지",
+        f"{r['dice_coverage'] * 100:.1f}%",
+        "목표 충족" if r["meets_target"] else "목표 미달",
+        delta_color="normal" if r["meets_target"] else "inverse",
+        border=True,
+        help=f"거절자 중 경로가 있는 비율, 목표 {s['coverage_target'] * 100:.0f}% 이상",
+    )
+    m2.metric("씬파일러", f"{(r['dice_coverage_thin'] or 0) * 100:.1f}%", border=True)
+    m3.metric("그 외", f"{(r['dice_coverage_not_thin'] or 0) * 100:.1f}%", border=True)
+    m4.metric(
+        "경로 기간 중앙값",
+        f"{r['median_months']:g}개월" if r["median_months"] else "-",
+        border=True,
+    )
+
+    approval = s.get("approval")
+    if approval:
+        o = approval["overall"]
+        st.markdown(f"**경로를 따랐을 때 승인 가능성** ({approval['horizon_months']}개월 경로)")
+        st.warning(
+            f"경로가 있어도 승인이 보장되지는 않습니다. 평가 모델을 조금씩 다른 데이터로 "
+            f"{approval['models']}번 다시 만들어 {approval['paths']:,}개 경로를 확인해 보면, "
+            f"평균 {o['approval_rate'] * 100:.1f}% 에서 승인이 유지되고, "
+            f"{approval['models']}번 모두 승인된 경로는 {o['approved_by_all_models'] * 100:.1f}% "
+            "입니다. 경로 점수가 승인 기준에 가까울수록 승인 가능성이 낮습니다."
+        )
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "경로 점수": f"{b['min_score']}~{b['max_score']}점",
+                        "경로 수": f"{b['paths']:,}",
+                        "승인 가능성": f"{b['approval_rate'] * 100:.1f}%",
+                        f"{approval['models']}번 모두 승인": (
+                            f"{b['approved_by_all_models'] * 100:.1f}%"
+                        ),
+                    }
+                    for b in approval["bins"]
+                ]
+            ),
+            hide_index=True,
+            width="stretch",
+        )
+
+    st.markdown("**기간별 비교** (참고)")
+    x = [f"{r['horizon_months']}개월" for r in rows]
+    fig = go.Figure()
+    for key, name, color in (
+        ("dice_coverage", "전체", SERIES[0]),
+        ("dice_coverage_thin", "씬파일러", SERIES[1]),
+        ("dice_coverage_not_thin", "그 외", NEUTRAL),
+    ):
+        values = [h[key] for h in rows]
+        fig.add_bar(
+            name=name,
+            x=x,
+            y=values,
+            marker_color=color,
+            # 적용 기간만 진하게, 나머지는 흐리게
+            marker_opacity=[1.0 if h == pick else 0.45 for h in horizons],
+            # 숫자는 전체 막대에만 (씬파일러·그 외는 마우스를 올리면 보인다)
+            text=[f"{v * 100:.1f}%" for v in values] if key == "dice_coverage" else None,
+            textposition="outside",
+            hovertemplate="%{x} " + name + ": %{y:.1%}<extra></extra>",
+        )
+    fig.add_hline(
+        y=s["coverage_target"],
+        line_dash="dash",
+        line_color=RISK_UP,
+        annotation_text=f"목표 {s['coverage_target'] * 100:.0f}%",
+        annotation_position="top left",
+    )
+    fig.update_layout(
+        title="기간별 경로 커버리지 (거절자 중 경로가 있는 비율)",
+        barmode="group",
+        yaxis={"range": [0, 1.08], "tickformat": ".0%"},
+    )
+    chart(fig, height=360)
+
+    table = pd.DataFrame(
+        [
+            {
+                "기간": f"{h['horizon_months']}개월"
+                + (" (적용)" if h["horizon_months"] == pick else ""),
+                "커버리지": f"{h['dice_coverage'] * 100:.1f}%",
+                "씬파일러": f"{(h['dice_coverage_thin'] or 0) * 100:.1f}%",
+                "그 외": f"{(h['dice_coverage_not_thin'] or 0) * 100:.1f}%",
+                "상한 (코너)": f"{h['corner_bound'] * 100:.1f}%",
+                "경로 기간 중앙값": f"{h['median_months']:g}개월" if h["median_months"] else "-",
+                "목표 충족": "예" if h["meets_target"] else "아니오",
+            }
+            for h in rows
+        ]
+    )
+    st.dataframe(table, hide_index=True, width="stretch")
+
+    left, right = st.columns(2)
+    with left:
+        top = list(reversed(r["top_paths"]))
+        fig = go.Figure(
+            go.Bar(
+                x=[p["count"] for p in top],
+                y=[" + ".join(short(lb) for lb in p["labels"]) for p in top],
+                orientation="h",
+                marker_color=SERIES[0],
+            )
+        )
+        fig.update_layout(title=f"많이 쓰인 경로 Top {len(top)} ({pick}개월)", xaxis_title="건수")
+        chart(fig, height=320)
+    with right:
+        need = r["vars_needed"]
+        fig = go.Figure(
+            go.Bar(
+                x=[f"{k}개" for k in need],
+                y=list(need.values()),
+                marker_color=SERIES[1],
+                text=list(need.values()),
+                textposition="outside",
+            )
+        )
+        fig.update_layout(title=f"경로가 바꾸는 변수 수 ({pick}개월)", yaxis_title="건수")
+        chart(fig, height=320)
+    source_caption(s["is_dummy"], s["source"], s["note"])
 
 
 # ---------------------------------------------------------------------------
@@ -648,6 +880,7 @@ def tab_statistics() -> None:
 TABS = {
     "고객 심사": tab_review,
     "XAI 분석": tab_xai,
+    "승인 경로": tab_recourse,
     "공정성": tab_fairness,
     "모델 성능": tab_performance,
     "통계 검증": tab_statistics,

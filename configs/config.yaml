@@ -23,6 +23,7 @@ performance_targets:
   thin_filer_auc_uplift_min: 0.03
   psi_max: 0.10
   predict_latency_sec_max: 2.0
+  recourse_coverage_min: 0.90          # 헌장: 거절자 중 승인 경로(DiCE)가 있는 비율
 
 explainer:
   summary_top_features: 15
@@ -128,6 +129,15 @@ statistics:
       filter: {segment: all, features: both}
       labels: {lr: LogisticRegression, xgb: XGBoost, lgbm: LightGBM}
 
+# 승인 경로의 승인 유지 확률 (python -m src.models.path_robustness). 배포 모델과 같은 설정을
+# train+validation 의 일부로 여러 번 다시 학습해, 경로를 따른 고객을 몇 % 의 모델이 승인하는지 본다.
+# 기간은 api.recourse_default_horizon, 경로는 reports/recourse/paths_<기간>m.csv
+recourse_approval:
+  models: 20              # 다시 학습할 모델 수
+  sample_share: 0.8       # 모델마다 쓰는 train+validation 비율 (점검 notebooks/audit.py 와 같음)
+  seed: 2026              # 표본 추출 시드 (모델 k 는 seed + k)
+  score_bins: [475, 495, 500, 505, 510, 520, 540, 1000]   # 표시용 점수 구간 (경로 후 점수)
+
 api:
   # API 가 읽는 산출물 (REPORTS_DIR 기준 상대 경로). 학습·점검 코드가 만든다
   reports:
@@ -139,11 +149,18 @@ api:
     shap_global: shap_global_top10.csv     # notebooks/model_report.py
     shap_summary_plot: figures/13_shap_summary_{lang}.png  # python -m src.explainer.global_shap
     test_curves: test_curves.json          # python -m src.models.curves (test 세트 ROC / PR 곡선)
+    recourse_summary: recourse/summary.json  # python -m src.explainer.recourse (test 세트 거절자, 기간별)
+    recourse_approval: recourse/approval_probability.json  # python -m src.models.path_robustness
+  # POST /recourse 의 기본 기간 (개월). 대시보드는 이 기간으로 고정한다. 18개월은 경로 커버리지가
+  # 목표 90% 를 처음 넘는 기간이다. 고를 수 있는 기간은 explainer.recourse.horizons_months
+  recourse_default_horizon: 18
   # ROC / PR 곡선에서 고를 기준점 수 (python -m src.models.curves). 예측 부도 건수를 로그 간격으로
   # 나눠 곡선이 빠르게 변하는 낮은 FPR 구간에 점을 더 둔다
   curve_points: 100
 
 dashboard:
+  # POST /recourse (DiCE 실시간 탐색) 요청의 응답 대기 시간 (초). 다른 요청은 10초
+  recourse_timeout_seconds: 60
   # 리스크 등급별 위험도 색상 (고위험 = 빨강, 중위험 = 노랑, 저위험 = 초록)
   risk_levels:
     A: low

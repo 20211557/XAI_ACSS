@@ -232,11 +232,16 @@ Swagger UI: http://localhost:8000/docs (요청 예시 포함). 응답의 `is_dum
 | `/explain/global` | GET | 전역 SHAP 중요도 (대시보드용) | 실제 (Top 10, `reports/shap_global_top10.csv`) |
 | `/explain/global/summary-plot` | GET | SHAP Summary Plot 이미지 (상위 15개, PNG, `lang=ko\|en`, 대시보드 XAI 탭용) | 실제 (`reports/figures/13_shap_summary_*.png`) |
 | `/features` | GET | 입력 변수 설명·범위·기본값 (대시보드 입력 폼용) | 실제 |
+| `/recourse` | POST | DiCE 승인 경로: 거절 고객이 바꿀 수 있는 변수 3개 이하를 기간(`horizon`, 6/9/12/18/24개월, 기본 18) 안에 바꿔 495점에 닿는 방법 (변수별 현재값·목표값·기간, 경로 후 점수). 경로를 이렇게 정한 이유 (`summary`) 와 항목별 이유 (`why`: 이것만 바뀔 때와 빠질 때의 점수) 를 일반인도 이해할 수 있는 말로, 경로를 따랐을 때 승인 가능성 (`approval_probability`), 경로가 없으면 막는 항목 (`blockers`). 약 0.5초 | 실제 (배포 모델 + DiCE) |
+| `/recourse/summary` | GET | 기간별 경로 커버리지 (test 세트 거절자, 씬파일러 구분, 많이 쓰인 경로), 목표 90% 충족 여부 | 실제 (`reports/recourse/summary.json`) |
 
 - 고객 입력 JSON 의 키는 학습 데이터 컬럼명이다 (예: `NumberOfTimes90DaysLate`). 값이 `null` 이면 학습 데이터 중앙값으로
   대체되며, 원시 입력에는 학습 때와 같은 정제 규칙(특수코드 96/98, 소득 결측·0, 사용률 이상치)이 적용된다 (`src/models/predictor.py`).
 - 거절 사유의 `shap_contribution` 은 과제 예시처럼 승인 방향 기준이다 (음수 = 거절 쪽). 비교 기준은 학습 데이터 중앙값이다.
 - `/predict` 응답 시간은 약 0.03초다 (모델과 SHAP explainer 는 서버 시작 때 미리 불러온다).
+- **경로를 따라도 승인은 보장되지 않는다.** `approval_probability` 는 배포 모델 설정을 train+validation 의 80% 로 20번 다시 학습해, 18개월 경로 (test 거절자 2,682개) 를 몇 % 의 모델이 승인하는지 본 값이다 (경로 점수에 따른 증가 곡선, `python -m src.models.path_robustness`, 결과 `reports/recourse/approval_probability.json`). 평균 92.1%, 495~499점 경로 88.7%, 540점 이상 100%, 20번 모두 승인된 경로는 49.0%. 모델을 다시 학습하거나 경로를 다시 계산하면 이 명령도 다시 실행한다.
+- `/recourse` 의 기본 기간 18개월 (`api.recourse_default_horizon`) 은 경로 커버리지가 목표 90% 를 처음 넘는 기간이며, 대시보드는 이 기간으로 고정한다. 시간 의존 변수 (예: 건강보험 납부 개월수) 의 설명은 행동을 권하지 않고 기간만 말한다 (`configs/actionability.yaml` 규칙).
+- `/recourse` 는 `src/explainer/recourse.py` (DiCE) 의 함수를 그대로 써서 배치 실행과 같은 규칙으로 찾는다. 같은 입력이면 같은 경로가 나온다 (시드 고정). `/recourse/summary` 의 `model_match` 가 false 면 거절자 수가 지금 배포 모델과 달라 `python -m src.explainer.recourse` 를 다시 돌려야 한다.
 - ANOVA 검증 정의(집단, 필터, 라벨)는 `configs/config.yaml` 의 `statistics.anova` 에서 바꿀 수 있다.
 
 ## 모델 결과 (공식: 테스트 세트, 배포 모델 `models/xgboost_v1.0.joblib`)
@@ -409,7 +414,7 @@ XGBoost, 변수 21개, 불균형 처리 없음, 단조 제약 13개. train + val
 - [x] 20. Bias Mitigation 구현 (Reweighting, Threshold Adjustment) · `src/fairness/mitigation.py`, [리포트](reports/fairness_report_ko.md)
 - [x] 21. FastAPI 서버 구현 (7개 엔드포인트) · ROC·PR 곡선은 test 세트 실제 점수 (`src/models/curves.py`)
 - [x] 22. Pydantic 스키마 정의 및 Swagger UI 설정
-- [x] 23. Streamlit 대시보드 구현 (5개 탭)
+- [x] 23. Streamlit 대시보드 구현 (6개 탭: 고객 심사, XAI 분석, 승인 경로, 공정성, 모델 성능, 통계 검증). 고객 심사 탭에서 거절되면 DiCE 승인 경로 (18개월 고정) 와 그 근거를 바로 보여준다 (`POST /recourse`)
 - [x] 24. API ↔ 대시보드 연동 테스트
 - [x] 25. pytest 유닛 테스트 10개 이상 작성
 - [x] 26. docker-compose.yml 작성 및 통합 테스트 (API + Dashboard + MLflow)

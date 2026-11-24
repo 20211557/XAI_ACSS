@@ -3,10 +3,12 @@
 과제 명세 엔드포인트 7개:
   /health, /predict, /explain, /fairness, /fairness/mitigation, /metrics, /anova
 대시보드용 추가: /features (입력 폼 정보), /explain/global (전역 SHAP),
-               /explain/global/summary-plot (SHAP Summary Plot 이미지)
+               /explain/global/summary-plot (SHAP Summary Plot 이미지),
+               /recourse (DiCE 승인 경로), /recourse/summary (기간별 경로 커버리지)
 
-실제 값: 배포 모델(/predict, /explain),
-        reports/ 산출물(/metrics, /fairness, /fairness/mitigation, /anova, /explain/global).
+실제 값: 배포 모델(/predict, /explain, /recourse),
+        reports/ 산출물(/metrics, /fairness, /fairness/mitigation, /anova, /explain/global,
+        /recourse/summary).
 더미 값: reports/test_curves.json 이 없거나 배포 모델과 다를 때의 ROC/PR 곡선만 예시 값으로
         그리고 is_dummy 로 표시한다 (src/api/dummy.py).
 """
@@ -22,6 +24,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from src.api import dummy, reports
+from src.api import recourse as recourse_service
 from src.api.schemas import (
     AnovaResponse,
     CreditApplication,
@@ -33,6 +36,8 @@ from src.api.schemas import (
     MetricsResponse,
     MitigationResponse,
     PredictResponse,
+    RecourseResponse,
+    RecourseSummaryResponse,
 )
 from src.config import get_settings, load_config
 from src.utils.logger import get_logger
@@ -97,6 +102,10 @@ async def lifespan(_: FastAPI):
         logger.info("모델 로드 완료: %s", settings.model_path.name)
     except Exception:  # 모델이 없어도 지표·공정성·ANOVA 엔드포인트는 동작해야 한다
         logger.warning("모델 없이 시작합니다. /predict, /explain 은 503 을 반환합니다")
+    try:
+        recourse_service.warm_up()
+    except Exception as exc:  # dice-ml 이 없거나 모델이 없으면 /recourse 만 실패한다
+        logger.warning("DiCE 경로 탐색을 준비하지 못했습니다: %s", exc)
     yield
 
 
@@ -107,7 +116,7 @@ app = FastAPI(
         "응답의 `is_dummy` 가 true 인 값은 아직 계산할 수 없어 넣은 예시 값이다.\n\n"
         f"> ⚠️ {config['project']['disclaimer']}"
     ),
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -261,6 +270,95 @@ def features() -> FeaturesResponse:
             }
         )
     return FeaturesResponse(features=out)
+
+
+@app.post(
+    "/recourse",
+    response_model=RecourseResponse,
+    tags=["xai"],
+    summary="DiCE 승인 경로 (거절 고객이 바꿀 수 있는 변수만, 기간 안에)",
+)
+def recourse(
+    application: CreditApplication,
+    horizon: int | None = Query(
+        None,
+        description="경로 기간 (개월). configs/config.yaml 의 explainer.recourse.horizons_months "
+        "중 하나. 비우면 api.recourse_default_horizon",
+    ),
+) -> RecourseResponse:
+    rules = recourse_service.rules()
+    horizon = horizon or config["api"]["recourse_default_horizon"]
+    if horizon not in rules["horizons"]:
+        raise HTTPException(
+            status_code=422, detail=f"horizon 은 {rules['horizons']} 중 하나여야 합니다"
+        )
+    model, X, row = _score(application)
+    cutoff = recourse_service.approval_cutoff(model.scoring_cfg)
+    common = {
+        "customer_id": application.customer_id,
+        "approval_status": _status(row["approved"]),
+        "credit_score": int(row["score"]),
+        "horizon_months": horizon,
+        "target_score": rules["target"],
+        "approval_cutoff": cutoff,
+        "max_changed_features": rules["max_vars"],
+        "model_version": settings.model_id,
+        "timestamp": _now(),
+    }
+    if int(row["approved"]) == 1:
+        return RecourseResponse(
+            **common, status="approved", elapsed_seconds=0.0,
+            note="이미 승인된 고객이라 경로를 찾지 않습니다.",
+        )
+    # 이 고객의 SHAP: 경로 변수가 지금 위험을 얼마나 높이는지, 경로가 없을 때 무엇이 막는지 설명
+    _, values = _explainer().explain(X)
+    shap = {f: float(v) for f, v in zip(model.features, values[0], strict=True)}
+    try:
+        result = recourse_service.find_path(X, horizon, shap=shap, cutoff=cutoff)
+    except ImportError as exc:  # dice-ml 미설치
+        raise HTTPException(status_code=503, detail=f"DiCE 를 쓸 수 없습니다: {exc}") from exc
+    blockers = ", ".join(result["blockers"])
+    notes = {
+        "found": f"점수 {rules['target']}점 (승인 {cutoff}점 + 여유) 을 목표로, 바꿀 수 있는 "
+        f"변수 {rules['max_vars']}개 이하를 {horizon}개월 안에 바꾸는 경로입니다. 변수는 동시에 "
+        "바꾸므로 전체 기간은 가장 오래 걸리는 변수의 기간입니다.",
+        "not_feasible": f"{horizon}개월 동안 바꿀 수 있는 항목을 {rules['max_vars']}가지까지 "
+        f"최대한 좋게 바꿔도 {rules['target']}점에 닿지 못합니다."
+        + (f" 점수를 가장 많이 깎는 항목 ({blockers}) 이 경로에 넣지 않는 것들이기 "
+           "때문입니다. 바꿀 수 없거나, 점수만 올리는 꼼수가 될 수 있어 일부러 뺀 항목입니다."
+           if blockers else ""),
+        "not_found": "목표에 닿는 조합은 있지만 DiCE 가 경로를 찾지 못했습니다.",
+    }
+    return RecourseResponse(**common, **result, note=notes[result["status"]])
+
+
+@app.get(
+    "/recourse/summary",
+    response_model=RecourseSummaryResponse,
+    tags=["xai"],
+    summary="기간별 승인 경로 커버리지 (test 세트 거절자, 미리 계산)",
+)
+def recourse_summary() -> RecourseSummaryResponse:
+    try:
+        body = recourse_service.summary(
+            config["api"]["recourse_default_horizon"],
+            config["performance_targets"]["recourse_coverage_min"],
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"{reports.source_of('recourse_summary')} 가 없습니다 "
+            "(python -m src.explainer.recourse 로 생성)",
+        ) from exc
+    note = (
+        "배포 모델이 test 세트에서 거절한 신청자 전체에 DiCE 를 돌린 결과 "
+        "(python -m src.explainer.recourse)."
+    )
+    if body["model_match"] is False:
+        note += " 거절자 수가 지금 배포 모델과 다릅니다. 경로를 다시 계산해야 합니다."
+    return RecourseSummaryResponse(
+        **body, source=reports.source_of("recourse_summary"), is_dummy=False, note=note
+    )
 
 
 @app.get(
