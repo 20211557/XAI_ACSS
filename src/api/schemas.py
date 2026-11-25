@@ -390,3 +390,102 @@ class FeatureInfo(BaseModel):
 
 class FeaturesResponse(BaseModel):
     features: list[FeatureInfo]
+
+
+class RecourseChange(BaseModel):
+    feature: str
+    feature_name_kr: str
+    current_value: float = Field(..., description="정제 후 모델 입력값")
+    proposed_value: float
+    current_text: str = Field(..., description="표시용 현재값 (예: 72%)")
+    proposed_text: str
+    steps: int = Field(..., description="configs/actionability.yaml 의 step 단위로 몇 단계")
+    months: float = Field(..., description="이 변수를 바꾸는 데 걸리는 기간 (단계 x 단계당 개월)")
+    difficulty: float
+    actionability: str
+    shap_now: float | None = Field(
+        None, description="지금 이 변수의 SHAP (부도 log-odds, 양수 = 위험을 높이는 중)"
+    )
+    score_if_only_this: int = Field(..., description="이 변수 하나만 바꿨을 때 점수")
+    score_without_this: int = Field(..., description="경로에서 이 변수만 뺐을 때 점수")
+    why: str = Field(..., description="이 항목을 바꾸는 이유 (위 숫자를 쉬운 말로)")
+
+
+class RecoursePath(BaseModel):
+    changes: list[RecourseChange]
+    months: float = Field(..., description="경로 기간 = 가장 오래 걸리는 변수의 기간 (동시 진행)")
+    score_after: int = Field(..., description="경로를 따랐을 때 배포 모델 점수")
+    cost: float = Field(..., description="난이도 x 기간 / 선택 기간의 합 (낮을수록 쉬움)")
+    linked_debt_ratio: float | None = Field(
+        None,
+        description="소득이 바뀌면 모델이 보는 부채비율 (부채 상환액은 그대로라는 가정)",
+    )
+    summary: str = Field(..., description="경로를 이렇게 정한 이유 (쉬운 말, 한두 문장)")
+    approval_probability: float | None = Field(
+        None,
+        description="경로를 따랐을 때 승인이 유지될 확률: 배포 모델 설정을 다시 학습한 모델들 중 "
+        "이 점수의 경로를 승인하는 비율 (python -m src.models.path_robustness). 표가 없으면 None",
+    )
+    approval_models: int | None = Field(None, description="확률 계산에 쓴 재학습 모델 수")
+
+
+class RecourseResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    customer_id: str | None = None
+    approval_status: ApprovalStatus
+    credit_score: int = Field(..., description="현재 점수")
+    status: Literal["approved", "found", "not_feasible", "not_found"] = Field(
+        ...,
+        description="approved: 이미 승인 / found: 경로 있음 / not_feasible: 기간 안에 변수 "
+        "max_changed_features 개 이하로는 목표에 닿을 수 없음 / not_found: 닿을 수 있지만 "
+        "DiCE 가 찾지 못함",
+    )
+    horizon_months: int
+    target_score: int = Field(..., description="경로 목표 점수 (configs/scoring.yaml)")
+    approval_cutoff: int
+    max_changed_features: int
+    path: RecoursePath | None = None
+    blockers: list[str] = Field(
+        default_factory=list,
+        description="경로가 없을 때: 경로로 바꿀 수 없는 변수 중 지금 위험을 가장 많이 높이는 것",
+    )
+    elapsed_seconds: float
+    note: str
+    model_version: str
+    timestamp: datetime
+
+
+class RecourseHorizon(BaseModel):
+    horizon_months: int
+    rejected: int
+    dice_coverage: float = Field(..., description="거절자 중 경로를 찾은 비율")
+    dice_coverage_thin: float | None = None
+    dice_coverage_not_thin: float | None = None
+    corner_bound: float = Field(..., description="경로가 존재할 수 있는 비율의 상한")
+    median_months: float | None = Field(None, description="찾은 경로의 기간 중앙값")
+    vars_needed: dict[str, int] = Field(..., description="바꾼 변수 수별 경로 수")
+    top_paths: list[dict] = Field(..., description="가장 많은 경로 (변수 이름, 건수)")
+    meets_target: bool
+
+
+class RecourseSummaryResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    horizons: list[RecourseHorizon]
+    default_horizon: int
+    target_score: int
+    coverage_target: float
+    max_changed_features: int
+    approval: dict | None = Field(
+        None,
+        description="재학습 모델 기준 승인 유지율 (전체, 경로 점수 구간별). 표가 없으면 None",
+    )
+    model_match: bool | None = Field(
+        None,
+        description="거절자 수가 배포 모델의 test 세트 거절자 수와 맞는지 "
+        "(아니면 경로를 다시 계산해야 함). final_summary.json 이 없으면 None",
+    )
+    source: str
+    is_dummy: bool
+    note: str

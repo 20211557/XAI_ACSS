@@ -69,6 +69,7 @@ services:
       - "[${BIND_ADDRESS_V6:-::1}]:${API_PORT:-8000}:8000"
     environment:
       <<: *common-env
+      TQDM_DISABLE: "1"   # DiCE(/recourse) 가 요청마다 찍는 진행 막대를 로그에서 뺀다
     volumes:
       - ./models:/app/models:ro
       - ./reports:/app/reports:ro

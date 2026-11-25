@@ -21,9 +21,11 @@ class ApiClient:
         self.base_url = (base_url or get_settings().api_url).rstrip("/")
         self.timeout = timeout
 
-    def _raw(self, method: str, path: str, **kwargs) -> requests.Response:
+    def _raw(
+        self, method: str, path: str, timeout: float | None = None, **kwargs
+    ) -> requests.Response:
         response = requests.request(
-            method, f"{self.base_url}{path}", timeout=self.timeout, **kwargs
+            method, f"{self.base_url}{path}", timeout=timeout or self.timeout, **kwargs
         )
         if not response.ok:
             try:
@@ -77,3 +79,12 @@ class ApiClient:
 
     def anova(self) -> dict:
         return self._get("/anova")
+
+    def recourse(self, payload: dict, horizon: int, timeout: float | None = None) -> dict:
+        """DiCE 승인 경로 (서버가 바로 탐색하므로 다른 요청보다 오래 걸릴 수 있다)."""
+        return self._request(
+            "POST", "/recourse", json=payload, params={"horizon": horizon}, timeout=timeout
+        )
+
+    def recourse_summary(self) -> dict:
+        return self._get("/recourse/summary")

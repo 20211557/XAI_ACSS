@@ -234,6 +234,8 @@ applies to the ROC and PR curves when `reports/test_curves.json` is missing or b
 | `/explain/global` | GET | Global SHAP importance (for the dashboard) | Real (top 10, `reports/shap_global_top10.csv`) |
 | `/explain/global/summary-plot` | GET | SHAP Summary Plot image (top 15, PNG, `lang=ko\|en`, for the dashboard XAI tab) | Real (`reports/figures/13_shap_summary_*.png`) |
 | `/features` | GET | Input variables with labels, ranges, defaults (for the dashboard form) | Real |
+| `/recourse` | POST | DiCE approval path: how a rejected applicant reaches 495 by changing at most 3 changeable variables within the horizon (`horizon`, 6/9/12/18/24 months, default 18); current and target value and time per variable, score after the path. Why the path was chosen (`summary`) and why each change is in it (`why`: score with only this change and without it), in plain Korean for non-experts; the chance the path is approved (`approval_probability`); when there is no path, what blocks it (`blockers`). About 0.5 seconds | Real (shipped model + DiCE) |
+| `/recourse/summary` | GET | Path coverage per horizon (rejected test applicants, thin-filer split, most common paths) and whether the 90% goal is met | Real (`reports/recourse/summary.json`) |
 
 - Customer JSON keys are the training column names (e.g. `NumberOfTimes90DaysLate`). `null` means missing and is imputed with
   the training median; raw inputs go through the same cleaning rules as training (codes 96/98, missing or zero income,
@@ -241,6 +243,9 @@ applies to the ROC and PR curves when `reports/test_curves.json` is missing or b
 - `shap_contribution` in the rejection reasons follows the mission example (approval direction, negative = toward rejection).
   The reference value is the training median.
 - `/predict` takes about 0.03 seconds (the model and SHAP explainer are loaded at startup).
+- **A path does not guarantee approval.** `approval_probability` comes from refitting the shipped setup 20 times on 80% of train+validation and checking what share of the refits approve each 18-month path (2,682 paths of rejected test applicants), as an increasing curve over the path score (`python -m src.models.path_robustness`, output `reports/recourse/approval_probability.json`). Mean 92.1%, 88.7% for paths scoring 495 to 499, 100% from 540; only 49.0% of paths are approved by all 20 refits. Rerun it after retraining the model or recomputing the paths.
+- The default horizon of `/recourse`, 18 months (`api.recourse_default_horizon`), is the first horizon where path coverage meets the 90% goal; the dashboard is fixed to it. For time-dependent variables (e.g. health insurance payment months) the explanation states the duration only and never phrases it as advice (rule in `configs/actionability.yaml`).
+- `/recourse` reuses the functions of `src/explainer/recourse.py` (DiCE), so it follows the same rules as the batch run. The same input always gives the same path (fixed seed). If `model_match` in `/recourse/summary` is false, the number of rejected applicants differs from the shipped model and `python -m src.explainer.recourse` must be rerun.
 - The ANOVA definitions (group, filter, labels) live in `statistics.anova` in `configs/config.yaml`.
 
 ## Model results (official: test set, shipped model `models/xgboost_v1.0.joblib`)
