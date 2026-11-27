@@ -497,7 +497,8 @@ def metrics() -> MetricsResponse:
     "/anova",
     response_model=AnovaResponse,
     tags=["statistics"],
-    summary="One-way ANOVA 2종 (피처 그룹별, 알고리즘별): F, p-value, η², Tukey HSD",
+    summary="One-way ANOVA 2종 (피처 그룹별, 알고리즘별): F, p-value, η², Tukey HSD. "
+    "보너스 test_3: 세그먼트 × 피처 구성 Two-way ANOVA (교호작용)",
 )
 def anova() -> AnovaResponse:
     from src.statistics.anova import run_tests
@@ -507,7 +508,9 @@ def anova() -> AnovaResponse:
         **results,
         source=reports.source_of("cv_fold_auc"),
         is_dummy=False,
-        note="train 분할 안의 5 × 5 폴드 AUC (segment = all). 검증 2 는 통합 피처끼리 비교한다. "
-        "폴드들이 학습 데이터를 공유해 독립 표본이 아니므로 p-value 는 근사값이다 "
-        "(reports/anova_report_ko.md).",
+        note="train 분할 안의 5 × 5 폴드 AUC. 검증 1, 2 는 segment = all 이고 "
+        "검증 2 는 통합 피처끼리 비교한다. 검증 3 은 XGBoost (리샘플링 없음) 의 "
+        "씬파일러·일반 AUC 이며, 같은 폴드의 두 값이 같은 모델에서 나오므로 "
+        "폴드별 짝지은 교호작용 검정을 함께 보고한다. 폴드들이 학습 데이터를 공유해 "
+        "독립 표본이 아니므로 p-value 는 근사값이다 (reports/anova_report_ko.md).",
     )

@@ -213,6 +213,13 @@ def test_anova_returns_both_tests_with_tukey_when_significant():
         assert (t["post_hoc_tukey"] is not None) == t["is_significant"]
     assert body["test_1"]["is_significant"]  # 과제 기준: 최소 1개 검증이 p < 0.05
 
+    # 보너스: 세그먼트 × 피처 구성 이원 ANOVA, 칸당 5 × 5 폴드
+    t3 = body["test_3"]
+    assert [e["term"] for e in t3["effects"]] == ["segment", "features", "segment:features"]
+    assert all(0 <= e["partial_eta_squared"] <= 1 for e in t3["effects"])
+    assert [c["n"] for c in t3["cell_means"]] == [25] * 4
+    assert t3["paired_check"]["n_pairs"] == 25
+
 
 def test_dashboard_helper_endpoints():
     shap_global = client.get("/explain/global").json()

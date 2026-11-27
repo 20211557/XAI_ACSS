@@ -874,7 +874,69 @@ def tab_statistics() -> None:
             )
             fig.update_layout(title="집단별 평균 AUC", yaxis={"range": [low - pad, high + pad]})
             chart(fig, height=300)
+    two_way_section(a["test_3"])
     source_caption(a["is_dummy"], a["source"], a["note"])
+
+
+def two_way_section(t: dict) -> None:
+    """보너스 Two-way ANOVA: 효과 표, 칸 평균, 짝지은 교호작용 검정, 교호작용 그래프."""
+    st.subheader(f"보너스 · {t['test_name']}")
+    row_factor, col_factor = t["factors"]
+    left, right = st.columns([3, 2])
+    with left:
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "효과": e["effect"],
+                        "F 통계량": e["f_statistic"],
+                        "p-value": fmt_p(e["p_value"]),
+                        "부분 η²": e["partial_eta_squared"],
+                        "해석": e["effect_size_ko"],
+                        "유의 (p < α)": "예" if e["is_significant"] else "아니오",
+                    }
+                    for e in t["effects"]
+                ]
+            ),
+            hide_index=True,
+            width="stretch",
+        )
+        cells = pd.DataFrame(t["cell_means"]).pivot(index="row", columns="column", values="mean")
+        cells = cells.loc[t["levels"][row_factor], t["levels"][col_factor]]
+        cells[f"향상 ({' - '.join(reversed(t['levels'][col_factor]))})"] = pd.Series(
+            t["simple_effects"]
+        )
+        st.markdown(f"**칸별 평균 AUC** (칸당 {t['cell_means'][0]['n']}개)")
+        st.dataframe(cells.rename_axis(row_factor).round(4), width="stretch")
+        pc = t["paired_check"]
+        st.markdown(
+            f"**보조 점검 (짝지은 교호작용 검정)**: 향상 차이 평균 {pc['mean_contrast']:+.4f}, "
+            f"t = {pc['t_statistic']:.2f}, p = {fmt_p(pc['p_value'])}, "
+            f"{pc['n_pairs']}개 폴드 중 {pc['positive_pairs']}개 양수"
+        )
+        st.caption(f"{pc['description']}. 같은 폴드의 두 값이 같은 모델에서 나오는 상관을 지운다.")
+    with right:
+        fig = go.Figure()
+        for i, level in enumerate(t["levels"][row_factor]):
+            rows = [c for c in t["cell_means"] if c["row"] == level]
+            fig.add_trace(
+                go.Scatter(
+                    x=[c["column"] for c in rows],
+                    y=[c["mean"] for c in rows],
+                    name=level,
+                    mode="lines+markers+text",
+                    marker_color=SERIES[i % len(SERIES)],
+                    text=[f"{c['mean']:.4f}" for c in rows],
+                    textposition="top left" if i == 0 else "bottom right",
+                )
+            )
+        fig.update_layout(
+            title="교호작용 그래프 (기울기 차이 = 교호작용)",
+            xaxis_title=col_factor,
+            yaxis_title="평균 AUC",
+            legend={"orientation": "h", "y": -0.25},
+        )
+        chart(fig, height=340)
 
 
 TABS = {

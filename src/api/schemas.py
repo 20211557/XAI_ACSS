@@ -354,9 +354,55 @@ class AnovaResult(BaseModel):
     data_filter: dict[str, str]
 
 
+class TwoWayEffect(BaseModel):
+    effect: str
+    term: str
+    sum_sq: float
+    df: int
+    f_statistic: float
+    p_value: float
+    partial_eta_squared: float
+    effect_size: str
+    effect_size_ko: str
+    is_significant: bool
+
+
+class CellMean(BaseModel):
+    row: str
+    column: str
+    mean: float
+    sd: float
+    n: int
+
+
+class PairedCheck(BaseModel):
+    description: str
+    n_pairs: int
+    mean_contrast: float
+    sd_contrast: float
+    t_statistic: float
+    p_value: float
+    positive_pairs: int
+    is_significant: bool
+
+
+class TwoWayAnovaResult(BaseModel):
+    test_name: str
+    factors: list[str]
+    levels: dict[str, list[str]]
+    effects: list[TwoWayEffect]
+    residual_df: int
+    cell_means: list[CellMean]
+    simple_effects: dict[str, float] = Field(description="행 수준별 피처 구성 효과 (통합 - 전통)")
+    alpha: float
+    paired_check: PairedCheck = Field(description="폴드별 짝지은 교호작용 대비 t-검정")
+    data_filter: dict[str, str | list[str]]
+
+
 class AnovaResponse(BaseModel):
     test_1: AnovaResult
     test_2: AnovaResult
+    test_3: TwoWayAnovaResult = Field(description="보너스: 세그먼트 × 피처 구성 Two-way ANOVA")
     source: str
     is_dummy: bool
     note: str
