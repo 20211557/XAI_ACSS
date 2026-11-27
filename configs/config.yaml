@@ -128,6 +128,18 @@ statistics:
       group: model
       filter: {segment: all, features: both}
       labels: {lr: LogisticRegression, xgb: XGBoost, lgbm: LightGBM}
+  # 보너스: 세그먼트 × 피처 구성 이원 ANOVA. 최종 설정(xgb, 리샘플링 없음)만 써서 알고리즘·리샘플링
+  # 차이가 잔차에 섞이지 않게 한다. 필터의 목록 순서가 수준 순서다 (교호작용 대비 =
+  # 첫 세그먼트의 피처 효과 - 둘째 세그먼트의 피처 효과). 같은 폴드의 씬파일러·일반 AUC 는
+  # 같은 모델에서 나와 독립이 아니므로 pair_on 으로 짝지은 교호작용 대비 t-검정을 함께 보고한다
+  two_way_anova:
+    test_3:
+      name: 세그먼트 × 피처 구성별 AUC 비교 (Two-way ANOVA)
+      factors: [segment, features]
+      filter: {model: xgb, resampling: none, segment: [thin, general], features: [gmsc, both]}
+      factor_labels: {segment: 세그먼트, features: 피처 구성}
+      labels: {thin: 씬파일러, general: 일반, gmsc: 전통, both: 통합}
+      pair_on: [repeat, fold]
 
 # 승인 경로의 승인 유지 확률 (python -m src.models.path_robustness). 배포 모델과 같은 설정을
 # train+validation 의 일부로 여러 번 다시 학습해, 경로를 따른 고객을 몇 % 의 모델이 승인하는지 본다.

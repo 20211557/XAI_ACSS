@@ -12,7 +12,7 @@ from src.explainer.reasons import (
     short_label,
     subject_particle,
 )
-from src.statistics.anova import eta_squared, one_way_anova
+from src.statistics.anova import eta_squared, one_way_anova, two_way_anova
 
 
 @pytest.mark.parametrize(
@@ -108,3 +108,52 @@ def test_one_way_anova_runs_tukey_only_when_significant():
     assert sig["is_significant"] and len(sig["post_hoc_tukey"]) == 3
     assert sig["groups"] == ["A", "B", "C"] and sig["effect_size"] == "large"
     assert not nonsig["is_significant"] and nonsig["post_hoc_tukey"] is None
+
+
+def _two_by_two(interaction: float, seed: int) -> pd.DataFrame:
+    """2 × 2 칸, 폴드 25개. 폴드 효과는 네 칸에 공통이고 thin 의 both 칸에만 interaction 을 더한다."""
+    rng = np.random.default_rng(seed)
+    fold_effect = rng.normal(0, 0.01, 25)
+    base = {
+        ("thin", "gmsc"): 0.85,
+        ("thin", "both"): 0.93,
+        ("general", "gmsc"): 0.86,
+        ("general", "both"): 0.94,
+    }
+    rows = [
+        {
+            "segment": s,
+            "features": f,
+            "fold": k,
+            "auc": mean
+            + (interaction if (s, f) == ("thin", "both") else 0)
+            + fold_effect[k]
+            + rng.normal(0, 0.003),
+        }
+        for (s, f), mean in base.items()
+        for k in range(25)
+    ]
+    return pd.DataFrame(rows)
+
+
+def test_two_way_anova_detects_planted_interaction_only():
+    levels = {"segment": ["thin", "general"], "features": ["gmsc", "both"]}
+    with_ix = two_way_anova(
+        _two_by_two(0.01, 0),
+        ["segment", "features"],
+        levels,
+        pair_on=["fold"],
+        labels={"thin": "씬파일러"},
+    )
+    without = two_way_anova(_two_by_two(0.0, 1), ["segment", "features"], levels, pair_on=["fold"])
+
+    effects = {e["term"]: e for e in with_ix["effects"]}
+    assert set(effects) == {"segment", "features", "segment:features"}
+    assert effects["segment:features"]["is_significant"] and effects["features"]["is_significant"]
+    assert with_ix["simple_effects"]["씬파일러"] == pytest.approx(0.09, abs=0.005)
+    pc = with_ix["paired_check"]
+    assert pc["n_pairs"] == 25 and pc["is_significant"]
+    assert pc["mean_contrast"] == pytest.approx(0.01, abs=0.003)
+    assert [c["n"] for c in with_ix["cell_means"]] == [25] * 4
+    assert not without["paired_check"]["is_significant"]
+    assert not {e["term"]: e for e in without["effects"]}["segment:features"]["is_significant"]
